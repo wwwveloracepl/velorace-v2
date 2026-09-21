@@ -2,18 +2,16 @@
 
 import { useEffect, useState } from 'react'
 
-export default function ResultsDownloadLink({
+export default function StartlistsDownloadLink({
   raceId,
   className,
-  label = 'Pobierz wyniki',
+  label = 'Listy startowe',
 }: {
   raceId: string
   className: string
-  /** Unused when results are missing — link is hidden entirely. */
-  disabledClassName?: string
   label?: string
 }) {
-  const [hasResults, setHasResults] = useState(false)
+  const [hasStartlists, setHasStartlists] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -21,17 +19,17 @@ export default function ResultsDownloadLink({
     setLoading(true)
 
     const q = new URLSearchParams({ raceId })
-    fetch(`/api/results?${q.toString()}`, { cache: 'no-store' })
+    fetch(`/api/startlists?${q.toString()}`, { cache: 'no-store' })
       .then(r => r.json().catch(() => ({})))
       .then((d: { ok?: boolean; urls?: Record<string, string | null> }) => {
         if (cancelled) return
         const urls = d?.urls ?? {}
         const any = Object.values(urls).some(Boolean)
-        setHasResults(any)
+        setHasStartlists(any)
       })
       .catch(() => {
         if (cancelled) return
-        setHasResults(false)
+        setHasStartlists(false)
       })
       .finally(() => {
         if (cancelled) return
@@ -43,10 +41,10 @@ export default function ResultsDownloadLink({
     }
   }, [raceId])
 
-  if (loading || !hasResults) return null
+  if (loading || !hasStartlists) return null
 
   return (
-    <a href={`/wyniki/${raceId}/pobierz`} className={className}>
+    <a href={`/wyniki/${raceId}`} className={className}>
       {label}
     </a>
   )

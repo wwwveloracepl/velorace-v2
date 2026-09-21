@@ -11,7 +11,6 @@ const SHOW_LIVE_SECTION = false
 const NAV_LINKS = [
   { label: 'Strona główna', href: '/' },
   { label: 'Wyniki',        href: '/wyniki' },
-  { label: 'Kalendarz',     href: '/kalendarz' },
   { label: 'Live',          href: '/live', isLive: true, hidden: !SHOW_LIVE_SECTION },
   { label: 'Kontakt',       href: '/kontakt' },
 ]

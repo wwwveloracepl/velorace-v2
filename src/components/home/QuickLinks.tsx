@@ -4,7 +4,6 @@ import styles from './QuickLinks.module.css'
 const LINKS = [
   { icon: '🏆', label: 'Wyniki',      sub: 'Ostatnie i archiwalne', href: '/wyniki'    },
   { icon: '📋', label: 'Zgłoszenia',  sub: 'Otwarte zapisy',        href: '/zapisy'    },
-  { icon: '📅', label: 'Kalendarz wyścigów', sub: 'Pełna lista terminów', href: '/kalendarz' },
   { icon: '🔴', label: 'Live Timing', sub: 'Wyścig na żywo',        href: '/live'      },
 ]
 

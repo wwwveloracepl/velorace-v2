@@ -15,6 +15,12 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [pending, setPending] = useState(false)
 
+  useEffect(() => {
+    if (!loading && user) {
+      router.replace('/')
+    }
+  }, [loading, user, router])
+
   if (loading) {
     return (
       <>
@@ -29,12 +35,6 @@ export default function LoginPage() {
       </>
     )
   }
-
-  useEffect(() => {
-    if (!loading && user) {
-      router.replace('/')
-    }
-  }, [loading, user, router])
 
   if (user) {
     return (

@@ -8,12 +8,16 @@
 
 .row {
   display: grid;
-  grid-template-columns: 72px 1fr auto;
+  grid-template-columns: 132px 1fr auto;
   align-items: stretch;
   border-bottom: 1px solid var(--border);
   cursor: pointer;
   transition: background 0.15s;
   text-decoration: none;
+}
+
+.rowNoActions {
+  grid-template-columns: 132px 1fr;
 }
 
 .row:last-child { border-bottom: none; }
@@ -28,11 +32,19 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  padding: 10px 8px;
+  gap: 8px;
+  padding: 12px 8px;
   text-align: center;
-  min-width: 72px;
+  min-width: 132px;
   transition: background 0.15s;
+}
+
+.date {
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  justify-content: center;
+  gap: 6px;
 }
 
 .day {
@@ -60,6 +72,14 @@
   flex-direction: column;
   justify-content: center;
   gap: 4px;
+  min-width: 0;
+}
+
+.nameRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .name {
@@ -69,6 +89,30 @@
   line-height: 1.2;
   color: var(--white);
   text-decoration: none;
+  min-width: 0;
+}
+
+.detailsIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  margin-top: -4px;
+  color: var(--stone);
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.detailsIcon:hover {
+  color: var(--red-b);
+  background: rgba(212, 0, 0, 0.12);
+}
+
+.detailsIconSvg {
+  width: 24px;
+  height: 24px;
 }
 
 .meta {
@@ -96,20 +140,33 @@
 }
 
 .regulationLink {
-  font-size: 12px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
   color: var(--red-b);
   text-decoration: none;
   width: fit-content;
+  margin-top: 2px;
 }
 
 .regulationLink:hover {
   text-decoration: underline;
 }
 
+.regulationLinkDisabled {
+  color: rgba(136, 150, 167, 0.55);
+  cursor: default;
+  pointer-events: none;
+}
+
 .tags {
   display: flex;
-  gap: 6px;
-  margin-top: 4px;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
 }
 
 .tag {
@@ -121,12 +178,24 @@
   padding: 2px 8px;
   border-radius: 2px;
   border: 1px solid;
+  white-space: nowrap;
 }
 
 .tagOpen {
   background: var(--red-dim);
   color: var(--red-b);
   border-color: rgba(212, 0, 0, 0.3);
+}
+
+.tagLink {
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.tagLink:hover {
+  background: rgba(212, 0, 0, 0.22);
+  border-color: rgba(212, 0, 0, 0.55);
 }
 
 .tagSoon {
@@ -222,11 +291,17 @@
 
 @media (max-width: 680px) {
   .row {
-    grid-template-columns: 60px 1fr;
+    grid-template-columns: 112px 1fr;
   }
 
   .dateBlock {
-    min-width: 60px;
+    min-width: 112px;
+    gap: 6px;
+    padding: 10px 6px;
+  }
+
+  .date {
+    gap: 4px;
   }
 
   .day {
@@ -235,6 +310,12 @@
 
   .month {
     font-size: 16px;
+  }
+
+  .tag {
+    font-size: 9px;
+    letter-spacing: 0.6px;
+    padding: 2px 5px;
   }
 
   .right {

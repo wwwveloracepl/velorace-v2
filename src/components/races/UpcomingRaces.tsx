@@ -4,6 +4,7 @@ import { listHomePageFinishedRacesCurrentYear, listHomePageRacesCurrentYear } fr
 import { getRaceTypeLabel } from '@/lib/raceDisplay'
 import type { Race } from '@/lib/types'
 import ResultsDownloadLink from '@/components/races/ResultsDownloadLink'
+import StartlistsDownloadLink from '@/components/races/StartlistsDownloadLink'
 import styles from './UpcomingRaces.module.css'
 
 function CalendarIcon() {
@@ -16,9 +17,26 @@ function CalendarIcon() {
   )
 }
 
-function StatusBadge({ status }: { status: Race['status'] }) {
+function DetailsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className={styles.detailsIconSvg} aria-hidden="true">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5" fill="none" />
+      <path d="M12 11v5.5M12 7.5h.01" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function StatusBadge({ status, raceId }: { status: Race['status']; raceId?: string }) {
+  if (status === 'open' && raceId) {
+    return (
+      <a href={`/zapisy/${raceId}`} className={`${styles.tag} ${styles.tagOpen} ${styles.tagLink}`}>
+        Zapisz się
+      </a>
+    )
+  }
+
   const map = {
-    open:     { label: 'Zapisy otwarte', cls: styles.tagOpen },
+    open:     { label: 'Zapisz się', cls: styles.tagOpen },
     soon:     { label: 'Zapisy wkrótce', cls: styles.tagSoon },
     closed:   { label: 'Zapisy zamknięte', cls: styles.tagSoon },
     live:     { label: '● LIVE',         cls: styles.tagLive },
@@ -45,7 +63,7 @@ export default async function UpcomingRaces({
   return (
     <>
       <Widget
-        title="Nadchodzące wyścigi"
+        title="Wyścigi nadchodzące"
         moreLabel={showMoreLinks ? 'Cały kalendarz →' : undefined}
         moreHref={showMoreLinks ? '/kalendarz' : undefined}
       >
@@ -56,14 +74,30 @@ export default async function UpcomingRaces({
           const { day, month, full } = formatDate(race.date)
 
           return (
-            <div key={race.id} className={styles.row}>
+            <div key={race.id} className={`${styles.row} ${styles.rowNoActions}`}>
               <div className={styles.dateBlock}>
-                <div className={styles.day}>{day}</div>
-                <div className={styles.month}>{month}</div>
+                <div className={styles.date}>
+                  <div className={styles.day}>{day}</div>
+                  <div className={styles.month}>{month}</div>
+                </div>
+                <div className={styles.tags}>
+                  <StatusBadge status={race.status} raceId={race.id} />
+                  <span className={`${styles.tag} ${styles.tagCat}`}>{getRaceTypeLabel(race.category)}</span>
+                </div>
               </div>
 
               <div className={styles.info}>
-                <div className={styles.name}>{race.name}</div>
+                <div className={styles.nameRow}>
+                  <div className={styles.name}>{race.name}</div>
+                  <a
+                    href={`/wyniki/${race.id}`}
+                    className={styles.detailsIcon}
+                    aria-label="Zobacz szczegóły"
+                    title="Zobacz szczegóły"
+                  >
+                    <DetailsIcon />
+                  </a>
+                </div>
                 <div className={styles.meta}>
                   <span className={styles.metaWithIcon}>
                     <CalendarIcon />
@@ -72,37 +106,21 @@ export default async function UpcomingRaces({
                   <span>📍 {race.city}</span>
                   {race.spotsTaken > 0 && <span>👥 {race.spotsTaken} zaw.</span>}
                 </div>
-                <div className={styles.tags}>
-                  <StatusBadge status={race.status} />
-                  <span className={`${styles.tag} ${styles.tagCat}`}>{getRaceTypeLabel(race.category)}</span>
-                </div>
-              </div>
-
-              <div className={styles.right}>
-                <div className={styles.rightLinks}>
-                  <a href={`/wyniki/${race.id}`} className={styles.rightLink}>
-                    Zobacz szczegóły
+                <ResultsDownloadLink
+                  raceId={race.id}
+                  className={styles.regulationLink}
+                  label="Wyniki"
+                />
+                <StartlistsDownloadLink
+                  raceId={race.id}
+                  className={styles.regulationLink}
+                  label="Listy startowe"
+                />
+                {race.regulationUrl ? (
+                  <a href={race.regulationUrl} className={styles.regulationLink} target="_blank" rel="noreferrer">
+                    Pobierz regulamin
                   </a>
-                  {race.regulationUrl ? (
-                    <a href={race.regulationUrl} className={styles.rightLink} target="_blank" rel="noreferrer">
-                      Pobierz regulamin
-                    </a>
-                  ) : (
-                    <span className={`${styles.rightLink} ${styles.rightLinkDisabled}`}>Pobierz regulamin</span>
-                  )}
-                  <ResultsDownloadLink
-                    raceId={race.id}
-                    className={styles.rightLink}
-                    disabledClassName={styles.rightLinkDisabled}
-                  />
-                  {race.status === 'open' ? (
-                    <a href={`/zapisy/${race.id}`} className={styles.rightLink}>
-                      Zapisz się
-                    </a>
-                  ) : (
-                    <span className={`${styles.rightLink} ${styles.rightLinkDisabled}`}>Zapisz się</span>
-                  )}
-                </div>
+                ) : null}
               </div>
             </div>
           )
@@ -118,13 +136,29 @@ export default async function UpcomingRaces({
         {finishedRaces.map(race => {
           const { day, month, full } = formatDate(race.date)
           return (
-            <div key={race.id} className={styles.row}>
+            <div key={race.id} className={`${styles.row} ${styles.rowNoActions}`}>
               <div className={styles.dateBlock}>
-                <div className={styles.day}>{day}</div>
-                <div className={styles.month}>{month}</div>
+                <div className={styles.date}>
+                  <div className={styles.day}>{day}</div>
+                  <div className={styles.month}>{month}</div>
+                </div>
+                <div className={styles.tags}>
+                  <StatusBadge status="finished" />
+                  <span className={`${styles.tag} ${styles.tagCat}`}>{getRaceTypeLabel(race.category)}</span>
+                </div>
               </div>
               <div className={styles.info}>
-                <div className={styles.name}>{race.name}</div>
+                <div className={styles.nameRow}>
+                  <div className={styles.name}>{race.name}</div>
+                  <a
+                    href={`/wyniki/${race.id}`}
+                    className={styles.detailsIcon}
+                    aria-label="Zobacz szczegóły"
+                    title="Zobacz szczegóły"
+                  >
+                    <DetailsIcon />
+                  </a>
+                </div>
                 <div className={styles.meta}>
                   <span className={styles.metaWithIcon}>
                     <CalendarIcon />
@@ -132,30 +166,21 @@ export default async function UpcomingRaces({
                   </span>
                   <span>📍 {race.city}</span>
                 </div>
-                <div className={styles.tags}>
-                  <StatusBadge status="finished" />
-                  <span className={`${styles.tag} ${styles.tagCat}`}>{getRaceTypeLabel(race.category)}</span>
-                </div>
-              </div>
-              <div className={styles.right}>
-                <div className={styles.rightLinks}>
-                  <a href={`/wyniki/${race.id}`} className={styles.rightLink}>
-                    Zobacz szczegóły
+                <ResultsDownloadLink
+                  raceId={race.id}
+                  className={styles.regulationLink}
+                  label="Wyniki"
+                />
+                <StartlistsDownloadLink
+                  raceId={race.id}
+                  className={styles.regulationLink}
+                  label="Listy startowe"
+                />
+                {race.regulationUrl ? (
+                  <a href={race.regulationUrl} className={styles.regulationLink} target="_blank" rel="noreferrer">
+                    Pobierz regulamin
                   </a>
-                  {race.regulationUrl ? (
-                    <a href={race.regulationUrl} className={styles.rightLink} target="_blank" rel="noreferrer">
-                      Pobierz regulamin
-                    </a>
-                  ) : (
-                    <span className={`${styles.rightLink} ${styles.rightLinkDisabled}`}>Pobierz regulamin</span>
-                  )}
-                  <ResultsDownloadLink
-                    raceId={race.id}
-                    className={styles.rightLink}
-                    disabledClassName={styles.rightLinkDisabled}
-                  />
-                  <span className={`${styles.rightLink} ${styles.rightLinkDisabled}`}>Zapisz się</span>
-                </div>
+                ) : null}
               </div>
             </div>
           )
