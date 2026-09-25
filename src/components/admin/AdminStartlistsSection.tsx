@@ -364,7 +364,7 @@ export default function AdminStartlistsSection({
                           <div className={styles.slRowActions}>
                             <button
                               type="button"
-                              className={styles.btnGhost}
+                              className={styles.btnFileDelete}
                               disabled={!idle}
                               onClick={() => void deleteCombined(f.id)}
                             >
@@ -435,7 +435,7 @@ export default function AdminStartlistsSection({
                         <div className={styles.slRowActions}>
                           <button
                             type="button"
-                            className={styles.btnGhost}
+                            className={styles.btnFileDelete}
                             disabled={!idle}
                             onClick={() => void deleteGroup(g.id)}
                           >
