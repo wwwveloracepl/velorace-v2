@@ -9,6 +9,7 @@ type CombinedFile = {
   url: string
   fileName: string
   uploadedAt?: string
+  legacy?: boolean
 }
 
 type CategoryOpt = { id: string; name: string }
@@ -179,7 +180,11 @@ export default function AdminResultsSection({
     setError('')
     setSuccess('')
     try {
-      const q = new URLSearchParams(fileId === 'legacy' ? { legacy: '1' } : { fileId })
+      const q = new URLSearchParams(
+        fileId === 'legacy'
+          ? { legacy: '1' }
+          : { fileId },
+      )
       const res = await fetch(
         `/api/admin/races/${encodeURIComponent(raceId)}/results-combined/upload?${q.toString()}`,
         { method: 'DELETE', credentials: 'include' },

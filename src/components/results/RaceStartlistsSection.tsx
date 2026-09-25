@@ -11,6 +11,7 @@ type CombinedItem = { id: string; label: string; url: string; fileName: string }
 type StartlistsResponse = {
   ok?: boolean
   urls?: Record<string, string | null>
+  fileNames?: Record<string, string | null>
   combined?: CombinedItem[] | { url: string; fileName: string } | null
   waves?: { id: string; label: string; url: string; fileName: string }[]
   groups?: { id: string; label: string; url: string; fileName: string }[]
@@ -37,6 +38,12 @@ function normalizeCombined(
   return []
 }
 
+function labelFromFileName(fileName: string | null | undefined, index: number): string {
+  const base = (fileName || '').replace(/\.pdf$/i, '').trim()
+  if (base) return base
+  return `Lista startowa ${index + 1}`
+}
+
 export default function RaceStartlistsSection({
   raceId,
   categories,
@@ -48,6 +55,7 @@ export default function RaceStartlistsSection({
 }) {
   const [loading, setLoading] = useState(true)
   const [urls, setUrls] = useState<Record<string, string | null>>({})
+  const [fileNames, setFileNames] = useState<Record<string, string | null>>({})
   const [combined, setCombined] = useState<CombinedItem[]>([])
   const [waves, setWaves] = useState<{ id: string; label: string; url: string }[]>([])
   const [groups, setGroups] = useState<{ id: string; label: string; url: string }[]>([])
@@ -59,6 +67,7 @@ export default function RaceStartlistsSection({
     setWaves([])
     setGroups([])
     setUrls({})
+    setFileNames({})
 
     const q = new URLSearchParams({ raceId })
     fetch(`/api/startlists?${q}`, { cache: 'no-store' })
@@ -67,12 +76,14 @@ export default function RaceStartlistsSection({
         if (cancelled) return
         if (!d?.ok) {
           setUrls({})
+          setFileNames({})
           setWaves([])
           setGroups([])
           setCombined(normalizeCombined(null, combinedStartlistUrl))
           return
         }
         setUrls(d.urls ?? {})
+        setFileNames(d.fileNames ?? {})
         setCombined(normalizeCombined(d.combined))
         setWaves((d.waves ?? []).map(w => ({ id: w.id, label: w.label, url: w.url })))
         setGroups((d.groups ?? []).map(g => ({ id: g.id, label: g.label, url: g.url })))
@@ -80,6 +91,7 @@ export default function RaceStartlistsSection({
       .catch(() => {
         if (cancelled) return
         setUrls({})
+        setFileNames({})
         setWaves([])
         setGroups([])
         setCombined(normalizeCombined(null, combinedStartlistUrl))
@@ -100,8 +112,23 @@ export default function RaceStartlistsSection({
       .filter(x => x.href)
   }, [categories, urls])
 
+  const orphanCategoryFiles = useMemo(() => {
+    const known = new Set(categories.map(c => c.id))
+    return Object.entries(urls)
+      .filter(([id, href]) => Boolean(href) && !known.has(id))
+      .map(([id, href], i) => ({
+        id,
+        href: href as string,
+        label: labelFromFileName(fileNames[id], i),
+      }))
+  }, [categories, urls, fileNames])
+
   const hasAny =
-    combined.length > 0 || publishedCategories.length > 0 || waves.length > 0 || groups.length > 0
+    combined.length > 0 ||
+    publishedCategories.length > 0 ||
+    orphanCategoryFiles.length > 0 ||
+    waves.length > 0 ||
+    groups.length > 0
 
   if (loading) return null
   if (!hasAny) return null
@@ -126,7 +153,6 @@ export default function RaceStartlistsSection({
               <span className={listStyles.action}>Pobierz</span>
             </a>
           ))}
-          {/* Stare pliki per fala / per kategoria — zostają widoczne */}
           {waves.map(w => (
             <a key={w.id} href={w.url} target="_blank" rel="noreferrer" className={listStyles.item}>
               <span className={listStyles.label}>{w.label}</span>
@@ -136,6 +162,12 @@ export default function RaceStartlistsSection({
           {publishedCategories.map(x => (
             <a key={x.cat.id} href={x.href ?? '#'} target="_blank" rel="noreferrer" className={listStyles.item}>
               <span className={listStyles.label}>{x.cat.name}</span>
+              <span className={listStyles.action}>Pobierz</span>
+            </a>
+          ))}
+          {orphanCategoryFiles.map(x => (
+            <a key={`orphan-${x.id}`} href={x.href} target="_blank" rel="noreferrer" className={listStyles.item}>
+              <span className={listStyles.label}>{x.label}</span>
               <span className={listStyles.action}>Pobierz</span>
             </a>
           ))}

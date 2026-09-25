@@ -7,6 +7,7 @@ import {
   combinedResultsFileBlobPrefix,
   combinedResultsPdfBlobPrefix,
   isPdfUpload,
+  resultsRaceRootBlobPrefixCandidates,
   safeResultUploadFileName,
 } from '@/lib/results'
 
@@ -190,6 +191,30 @@ export async function DELETE(req: NextRequest, ctx: { params: { id: string } | P
   const legacy = req.nextUrl.searchParams.get('legacy') === '1'
 
   try {
+    if (fileId.startsWith('legacy-path:')) {
+      const pathname = fileId.slice('legacy-path:'.length).trim()
+      const allowed = resultsRaceRootBlobPrefixCandidates(raceCtx.slug, raceId, raceCtx.raceYear)
+      const okPath = allowed.some(prefix => pathname.startsWith(prefix))
+      if (!pathname || !okPath) {
+        return NextResponse.json({ ok: false, message: 'Nieprawidłowa ścieżka pliku.' }, { status: 400 })
+      }
+      const parts = pathname.split('/').filter(Boolean)
+      // wyscigi_YYYY / slug / folder / ...
+      const folder = parts[2]
+      if (
+        folder !== 'kategorie' &&
+        folder !== 'fale' &&
+        folder !== 'kategoria' &&
+        folder !== 'fala'
+      ) {
+        return NextResponse.json({ ok: false, message: 'Można usunąć tylko plik ze starego modelu.' }, { status: 400 })
+      }
+      if (hasObjectStoreConfig()) {
+        await deleteObjectsByPath([pathname])
+      }
+      return NextResponse.json({ ok: true })
+    }
+
     // Stary pojedynczy plik z kolumn races.* (sprzed multi)
     if (legacy || fileId === 'legacy') {
       const prefix = combinedResultsPdfBlobPrefix(raceCtx.slug, raceCtx.raceYear)

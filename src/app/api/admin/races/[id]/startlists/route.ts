@@ -6,6 +6,7 @@ import { getRaceResultsPdfContext, isAllowedResultsRaceId } from '@/lib/raceDb'
 import {
   safeStartlistUploadFileName,
   startlistsForRaceBlobPrefix,
+  startlistsRaceRootBlobPrefix,
   startlistsWavesForRaceBlobPrefix,
 } from '@/lib/startlists'
 
@@ -42,6 +43,68 @@ function parseFolderFile(
   const fileName = parts.slice(5).join('/')
   if (!id || !fileName) return null
   return { id, fileName }
+}
+
+/** Pliki ze starego modelu (per kategoria / per fala) — do sekcji „Pliki ogólne”. */
+function collectLegacyStartlistFiles(params: {
+  racePrefix: string
+  blobs: Awaited<ReturnType<typeof listAllBlobsWithPrefix>>
+  categoryNames: Map<string, string>
+  waveLabels: Map<string, string>
+  skipUrls: Set<string>
+}): {
+  id: string
+  label: string
+  url: string
+  fileName: string
+  uploadedAt: string
+  legacy: true
+}[] {
+  const out: {
+    id: string
+    label: string
+    url: string
+    fileName: string
+    uploadedAt: string
+    legacy: true
+  }[] = []
+  const seen = new Set(params.skipUrls)
+
+  for (const blob of params.blobs) {
+    const pathname = blob.pathname
+    if (!pathname.startsWith(params.racePrefix)) continue
+    const rel = pathname.slice(params.racePrefix.length)
+    const parts = rel.split('/').filter(Boolean)
+    // Nowy model: laczna/, grupy/ — pomijamy (są w DB).
+    if (parts[0] === 'laczna' || parts[0] === 'grupy') continue
+    if (parts[0] !== 'kategorie' && parts[0] !== 'fale') continue
+    if (parts.length < 3) continue
+
+    const folderId = parts[1]
+    const fileName = safeStartlistUploadFileName(parts.slice(2).join('/'))
+    const url = blob.downloadUrl || blob.url
+    if (!url || seen.has(url) || seen.has(pathname)) continue
+    seen.add(url)
+    seen.add(pathname)
+
+    let label = ''
+    if (parts[0] === 'kategorie') {
+      label = params.categoryNames.get(folderId) || fileName.replace(/\.pdf$/i, '') || 'Lista startowa'
+    } else {
+      label = params.waveLabels.get(folderId) || fileName.replace(/\.pdf$/i, '') || 'Lista — fala'
+    }
+
+    out.push({
+      id: `legacy-path:${pathname}`,
+      label: `[stary] ${label}`,
+      url,
+      fileName,
+      uploadedAt: blob.uploadedAt || '',
+      legacy: true,
+    })
+  }
+
+  return out
 }
 
 export async function GET(req: NextRequest, ctx: { params: { id: string } | Promise<{ id: string }> }) {
@@ -84,6 +147,7 @@ export async function GET(req: NextRequest, ctx: { params: { id: string } | Prom
       url: string
       fileName: string
       uploadedAt: string
+      legacy?: boolean
     }[] = []
     try {
       const combinedRows = await sql`
@@ -114,16 +178,6 @@ export async function GET(req: NextRequest, ctx: { params: { id: string } | Prom
         }))
     } catch {
       // tabela może jeszcze nie istnieć
-    }
-
-    if (combined.length === 0 && rm.url) {
-      combined.unshift({
-        id: 'legacy',
-        label: '',
-        url: String(rm.url),
-        fileName: String(rm.file_name ?? ''),
-        uploadedAt: String(rm.uploaded_at ?? ''),
-      })
     }
 
     const catRows = await sql`
@@ -173,7 +227,7 @@ export async function GET(req: NextRequest, ctx: { params: { id: string } | Prom
         categoryFileNames[parsed.id] = safeStartlistUploadFileName(parsed.fileName)
       }
     } catch {
-      // brak konfiguracji R2 — sekcja i tak pokaże puste sloty
+      // brak konfiguracji R2
     }
 
     try {
@@ -198,6 +252,39 @@ export async function GET(req: NextRequest, ctx: { params: { id: string } | Prom
       }
     } catch {
       // ignore
+    }
+
+    // Pliki ze starego modelu (kategorie/fale w R2) → lista ogólna w panelu admina.
+    try {
+      const racePrefix = startlistsRaceRootBlobPrefix(raceCtx.slug, raceCtx.raceYear)
+      const allBlobs = await listAllBlobsWithPrefix(racePrefix)
+      const categoryNames = new Map(
+        (catRows as { id: string; name: string }[]).map(c => [String(c.id), String(c.name ?? '')]),
+      )
+      const waveLabels = new Map(waves.map(w => [w.id, w.label]))
+      const skipUrls = new Set(combined.map(c => c.url).filter(Boolean))
+      if (rm.url) skipUrls.add(String(rm.url))
+      const legacyFiles = collectLegacyStartlistFiles({
+        racePrefix,
+        blobs: allBlobs,
+        categoryNames,
+        waveLabels,
+        skipUrls,
+      })
+      combined = [...combined, ...legacyFiles]
+    } catch {
+      // ignore R2 errors
+    }
+
+    if (rm.url && !combined.some(c => c.url === String(rm.url))) {
+      combined.push({
+        id: 'legacy',
+        label: '[stary] Lista startowa',
+        url: String(rm.url),
+        fileName: String(rm.file_name ?? ''),
+        uploadedAt: String(rm.uploaded_at ?? ''),
+        legacy: true,
+      })
     }
 
     const groupRows = await sql`

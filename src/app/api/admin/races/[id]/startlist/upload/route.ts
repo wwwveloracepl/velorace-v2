@@ -4,7 +4,11 @@ import { getAuthUserFromRequest } from '@/lib/serverAuth'
 import { getDb } from '@/lib/db'
 import { getRaceResultsPdfContext } from '@/lib/raceDb'
 import { isPdfUpload, safeResultUploadFileName } from '@/lib/results'
-import { combinedStartlistBlobPrefix, combinedStartlistFileBlobPrefix } from '@/lib/startlists'
+import {
+  combinedStartlistBlobPrefix,
+  combinedStartlistFileBlobPrefix,
+  startlistsRaceRootBlobPrefix,
+} from '@/lib/startlists'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -185,6 +189,24 @@ export async function DELETE(req: NextRequest, ctx: { params: { id: string } | P
   const legacy = req.nextUrl.searchParams.get('legacy') === '1'
 
   try {
+    if (fileId.startsWith('legacy-path:')) {
+      const pathname = fileId.slice('legacy-path:'.length).trim()
+      const racePrefix = startlistsRaceRootBlobPrefix(raceCtx.slug, raceCtx.raceYear)
+      if (!pathname || !pathname.startsWith(racePrefix)) {
+        return NextResponse.json({ ok: false, message: 'Nieprawidłowa ścieżka pliku.' }, { status: 400 })
+      }
+      // Tylko stary model (kategorie/fale) — nie usuwaj nowego laczna/grupy tą ścieżką.
+      const rel = pathname.slice(racePrefix.length)
+      const top = rel.split('/').filter(Boolean)[0]
+      if (top !== 'kategorie' && top !== 'fale') {
+        return NextResponse.json({ ok: false, message: 'Można usunąć tylko plik ze starego modelu.' }, { status: 400 })
+      }
+      if (hasObjectStoreConfig()) {
+        await deleteObjectsByPath([pathname])
+      }
+      return NextResponse.json({ ok: true })
+    }
+
     if (legacy || fileId === 'legacy') {
       const prefix = combinedStartlistBlobPrefix(raceCtx.slug, raceCtx.raceYear)
       if (hasObjectStoreConfig()) {

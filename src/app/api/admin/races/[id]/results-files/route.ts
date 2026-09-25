@@ -6,6 +6,7 @@ import { getRaceResultsPdfContext, isAllowedResultsRaceId } from '@/lib/raceDb'
 import {
   flexibleResultsCategoriesForRaceBlobPrefix,
   flexibleResultsWavesForRaceBlobPrefix,
+  resultsRaceRootBlobPrefixCandidates,
   safeFlexibleResultUploadFileName,
 } from '@/lib/results'
 
@@ -90,7 +91,7 @@ export async function GET(req: NextRequest, ctx: { params: { id: string } | Prom
       ORDER BY g.uploaded_at NULLS LAST, g.created_at
     `
 
-    const combined = (combinedRows as {
+    let combined = (combinedRows as {
       id: string
       label: string
       file_url: string
@@ -106,17 +107,7 @@ export async function GET(req: NextRequest, ctx: { params: { id: string } | Prom
         uploadedAt: String(r.uploaded_at ?? ''),
       }))
 
-    // Legacy: plik tylko w kolumnach races (sprzed multi) — tylko gdy brak wpisów w tabeli.
-    if (combined.length === 0 && rm.url) {
-      combined.unshift({
-        id: 'legacy',
-        label: '',
-        url: String(rm.url),
-        fileName: String(rm.file_name ?? ''),
-        uploadedAt: String(rm.uploaded_at ?? ''),
-      })
-    }
-
+    // Legacy: plik tylko w kolumnach races — dołączymy niżej, jeśli nie ma w combined.
     const catRows = await sql`
       SELECT id::text AS id, name
       FROM race_categories
@@ -191,6 +182,78 @@ export async function GET(req: NextRequest, ctx: { params: { id: string } | Prom
       }
     } catch {
       // ignore
+    }
+
+    // Pliki ze starego modelu (kategorie/fale/kategoria/fala w R2) → lista ogólna.
+    try {
+      const skipUrls = new Set(combined.map(c => c.url).filter(Boolean))
+      if (rm.url) skipUrls.add(String(rm.url))
+      const categoryNames = new Map(
+        (catRows as { id: string; name: string }[]).map(c => [String(c.id), String(c.name ?? '')]),
+      )
+      const waveLabels = new Map(waves.map(w => [w.id, w.label]))
+      const prefixes = resultsRaceRootBlobPrefixCandidates(raceCtx.slug, raceId, raceCtx.raceYear)
+      const seenPath = new Set<string>()
+      for (const prefix of prefixes) {
+        const blobs = await listAllBlobsWithPrefix(prefix)
+        for (const blob of blobs) {
+          const pathname = blob.pathname
+          if (seenPath.has(pathname)) continue
+          seenPath.add(pathname)
+          if (!pathname.startsWith(prefix)) continue
+          const rel = pathname.slice(prefix.length)
+          const parts = rel.split('/').filter(Boolean)
+          // Nowy model: wyniki-zbiorcze/, grupy/, regulamin/
+          if (
+            parts[0] === 'wyniki-zbiorcze' ||
+            parts[0] === 'grupy' ||
+            parts[0] === 'regulamin'
+          ) {
+            continue
+          }
+          const isOldFlexible = parts[0] === 'kategorie' || parts[0] === 'fale'
+          const isOldSlot = parts[0] === 'kategoria' || parts[0] === 'fala'
+          if (!isOldFlexible && !isOldSlot) continue
+          if (parts.length < 3) continue
+
+          const folderId = parts[1]
+          const fileName = safeFlexibleResultUploadFileName(parts.slice(2).join('/'))
+          const url = blob.downloadUrl || blob.url
+          if (!url || skipUrls.has(url)) continue
+          skipUrls.add(url)
+
+          let label = fileName.replace(/\.pdf$/i, '') || 'Wyniki'
+          if (parts[0] === 'kategorie') {
+            label = categoryNames.get(folderId) || label
+          } else if (parts[0] === 'fale') {
+            label = waveLabels.get(folderId) || label
+          } else if (parts[0] === 'kategoria') {
+            label = `Wyniki — kategoria ${folderId}`
+          } else if (parts[0] === 'fala') {
+            label = `Wyniki — fala ${folderId}`
+          }
+
+          combined.push({
+            id: `legacy-path:${pathname}`,
+            label: `[stary] ${label}`,
+            url,
+            fileName,
+            uploadedAt: blob.uploadedAt || '',
+          })
+        }
+      }
+    } catch {
+      // ignore R2
+    }
+
+    if (rm.url && !combined.some(c => c.url === String(rm.url))) {
+      combined.push({
+        id: 'legacy',
+        label: '[stary] Wyniki łączne',
+        url: String(rm.url),
+        fileName: String(rm.file_name ?? ''),
+        uploadedAt: String(rm.uploaded_at ?? ''),
+      })
     }
 
     const groupRows = await sql`
