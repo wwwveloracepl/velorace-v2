@@ -1,13 +1,18 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import styles from './AdminDashboard.module.css'
 
-type FileMeta = { url: string; fileName: string; uploadedAt?: string }
-type CombinedFile = FileMeta & { id: string; label?: string }
+type CombinedFile = {
+  id: string
+  label?: string
+  url: string
+  fileName: string
+  uploadedAt?: string
+}
 
-type CategorySlot = { id: string; name: string; url: string | null; fileName: string | null }
-type WaveSlot = { id: string; label: string; url: string | null; fileName: string | null }
+type CategoryOpt = { id: string; name: string }
+
 type GroupSlot = {
   id: string
   label: string
@@ -20,10 +25,9 @@ type GroupSlot = {
 type ResultsPayload = {
   ok?: boolean
   message?: string
-  combined: CombinedFile[] | CombinedFile | null
-  categories: CategorySlot[]
-  waves: WaveSlot[]
-  groups: GroupSlot[]
+  combined?: CombinedFile[] | CombinedFile | null
+  categories?: (CategoryOpt & { url?: string | null; fileName?: string | null })[]
+  groups?: GroupSlot[]
 }
 
 function normalizeCombined(raw: ResultsPayload['combined']): CombinedFile[] {
@@ -39,12 +43,9 @@ export default function AdminResultsSection({
 }: {
   raceId: string | null
   raceName?: string
-  /** Zmiana wymusza odświeżenie (np. po zapisie kategorii/fal). */
   refreshKey?: number
 }) {
   const combinedInputRef = useRef<HTMLInputElement>(null)
-  const categoryInputRef = useRef<HTMLInputElement>(null)
-  const waveInputRef = useRef<HTMLInputElement>(null)
   const groupInputRef = useRef<HTMLInputElement>(null)
 
   const [loading, setLoading] = useState(false)
@@ -54,12 +55,9 @@ export default function AdminResultsSection({
 
   const [combined, setCombined] = useState<CombinedFile[]>([])
   const [combinedLabel, setCombinedLabel] = useState('')
-  const [categories, setCategories] = useState<CategorySlot[]>([])
-  const [waves, setWaves] = useState<WaveSlot[]>([])
+  const [categories, setCategories] = useState<CategoryOpt[]>([])
   const [groups, setGroups] = useState<GroupSlot[]>([])
 
-  const [pendingCategoryId, setPendingCategoryId] = useState<string | null>(null)
-  const [pendingWaveId, setPendingWaveId] = useState<string | null>(null)
   const [groupSelected, setGroupSelected] = useState<Record<string, boolean>>({})
   const [groupLabel, setGroupLabel] = useState('')
   const [cardOpen, setCardOpen] = useState(false)
@@ -69,11 +67,35 @@ export default function AdminResultsSection({
     setOpenSections(prev => ({ ...prev, [key]: !prev[key] }))
   }
 
+  const takenCategoryIds = useMemo(() => {
+    const s = new Set<string>()
+    for (const g of groups) {
+      for (const c of g.categories) s.add(c.id)
+    }
+    return s
+  }, [groups])
+
+  const availableCategories = useMemo(
+    () => categories.filter(c => !takenCategoryIds.has(c.id)),
+    [categories, takenCategoryIds],
+  )
+
+  const autoGroupLabel = useMemo(() => {
+    return categories
+      .filter(c => groupSelected[c.id])
+      .map(c => c.name.trim())
+      .filter(Boolean)
+      .join(' + ')
+  }, [categories, groupSelected])
+
+  useEffect(() => {
+    setGroupLabel(autoGroupLabel)
+  }, [autoGroupLabel])
+
   const load = useCallback(async () => {
     if (!raceId) {
       setCombined([])
       setCategories([])
-      setWaves([])
       setGroups([])
       return
     }
@@ -90,8 +112,9 @@ export default function AdminResultsSection({
         return
       }
       setCombined(normalizeCombined(data.combined))
-      setCategories(data.categories ?? [])
-      setWaves(data.waves ?? [])
+      setCategories(
+        (data.categories ?? []).map(c => ({ id: c.id, name: c.name })),
+      )
       setGroups(data.groups ?? [])
     } catch {
       setError('Błąd połączenia podczas wczytywania wyników.')
@@ -127,7 +150,7 @@ export default function AdminResultsSection({
         fileName?: string
       }
       if (!res.ok || !payload.ok || !payload.url || !payload.id) {
-        setError(payload.message || 'Nie udało się wgrać wyników łącznych.')
+        setError(payload.message || 'Nie udało się wgrać wyników.')
         return
       }
       setCombined(prev => [
@@ -141,7 +164,7 @@ export default function AdminResultsSection({
         },
       ])
       setCombinedLabel('')
-      setSuccess('Wgrano wyniki łączne.')
+      setSuccess('Wgrano plik wyników.')
     } catch {
       setError('Błąd połączenia podczas uploadu.')
     } finally {
@@ -151,101 +174,23 @@ export default function AdminResultsSection({
 
   async function deleteCombined(fileId: string) {
     if (!raceId) return
-    if (!window.confirm('Usunąć ten plik wyników łącznych?')) return
+    if (!window.confirm('Usunąć ten plik wyników?')) return
     setBusyKey(`combined:${fileId}`)
     setError('')
     setSuccess('')
     try {
-      const q = new URLSearchParams(
-        fileId === 'legacy' ? { legacy: '1' } : { fileId },
-      )
+      const q = new URLSearchParams(fileId === 'legacy' ? { legacy: '1' } : { fileId })
       const res = await fetch(
         `/api/admin/races/${encodeURIComponent(raceId)}/results-combined/upload?${q.toString()}`,
         { method: 'DELETE', credentials: 'include' },
       )
       const payload = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string }
       if (!res.ok || !payload.ok) {
-        setError(payload.message || 'Nie udało się usunąć wyników łącznych.')
+        setError(payload.message || 'Nie udało się usunąć pliku.')
         return
       }
       setCombined(prev => prev.filter(f => f.id !== fileId))
-      setSuccess('Usunięto plik wyników łącznych.')
-    } catch {
-      setError('Błąd połączenia podczas usuwania.')
-    } finally {
-      setBusyKey(null)
-    }
-  }
-
-  async function uploadSlot(kind: 'category' | 'wave', id: string, file: File) {
-    if (!raceId) return
-    setBusyKey(`${kind}:${id}`)
-    setError('')
-    setSuccess('')
-    try {
-      const data = new FormData()
-      data.set('file', file)
-      if (kind === 'category') data.set('categoryId', id)
-      else data.set('waveId', id)
-      const res = await fetch(`/api/admin/races/${encodeURIComponent(raceId)}/results-files/upload`, {
-        method: 'POST',
-        credentials: 'include',
-        body: data,
-      })
-      const payload = (await res.json().catch(() => ({}))) as {
-        ok?: boolean
-        message?: string
-        url?: string
-        fileName?: string
-      }
-      if (!res.ok || !payload.ok || !payload.url) {
-        setError(payload.message || 'Nie udało się wgrać wyników.')
-        return
-      }
-      if (kind === 'category') {
-        setCategories(prev =>
-          prev.map(c =>
-            c.id === id ? { ...c, url: payload.url!, fileName: payload.fileName || file.name } : c,
-          ),
-        )
-      } else {
-        setWaves(prev =>
-          prev.map(w =>
-            w.id === id ? { ...w, url: payload.url!, fileName: payload.fileName || file.name } : w,
-          ),
-        )
-      }
-      setSuccess('Wgrano wyniki.')
-    } catch {
-      setError('Błąd połączenia podczas uploadu.')
-    } finally {
-      setBusyKey(null)
-    }
-  }
-
-  async function deleteSlot(kind: 'category' | 'wave', id: string) {
-    if (!raceId) return
-    if (!window.confirm('Usunąć te wyniki?')) return
-    setBusyKey(`${kind}:${id}`)
-    setError('')
-    setSuccess('')
-    try {
-      const q = new URLSearchParams(kind === 'category' ? { categoryId: id } : { waveId: id })
-      const res = await fetch(
-        `/api/admin/races/${encodeURIComponent(raceId)}/results-files/upload?${q.toString()}`,
-        { method: 'DELETE', credentials: 'include' },
-      )
-      const payload = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string }
-      if (!res.ok || !payload.ok) {
-        setError(payload.message || 'Nie udało się usunąć wyników.')
-        return
-      }
-      if (kind === 'category') {
-        setCategories(prev => prev.map(c => (c.id === id ? { ...c, url: null, fileName: null } : c)))
-      } else {
-        setWaves(prev => prev.map(w => (w.id === id ? { ...w, url: null, fileName: null } : w)))
-      }
-      setSuccess('Usunięto wyniki.')
+      setSuccess('Usunięto plik wyników.')
     } catch {
       setError('Błąd połączenia podczas usuwania.')
     } finally {
@@ -259,7 +204,11 @@ export default function AdminResultsSection({
       .filter(([, on]) => on)
       .map(([id]) => id)
     if (categoryIds.length < 2) {
-      setError('Wybierz co najmniej dwie kategorie do jednej listy wyników.')
+      setError('Wybierz co najmniej dwie kategorie do jednego zestawu.')
+      return
+    }
+    if (categoryIds.some(id => takenCategoryIds.has(id))) {
+      setError('Niektóre wybrane kategorie są już w innym zestawie.')
       return
     }
     setBusyKey('group-new')
@@ -285,7 +234,7 @@ export default function AdminResultsSection({
         categoryIds?: string[]
       }
       if (!res.ok || !payload.ok || !payload.id || !payload.url) {
-        setError(payload.message || 'Nie udało się wgrać wyników dla grupy.')
+        setError(payload.message || 'Nie udało się wgrać wyników dla zestawu.')
         return
       }
       const cats = categories
@@ -304,7 +253,7 @@ export default function AdminResultsSection({
       ])
       setGroupSelected({})
       setGroupLabel('')
-      setSuccess('Wgrano wyniki dla grupy kategorii.')
+      setSuccess('Wgrano wyniki dla zestawu kategorii.')
     } catch {
       setError('Błąd połączenia podczas uploadu.')
     } finally {
@@ -314,7 +263,7 @@ export default function AdminResultsSection({
 
   async function deleteGroup(groupId: string) {
     if (!raceId) return
-    if (!window.confirm('Usunąć wyniki tej grupy kategorii?')) return
+    if (!window.confirm('Usunąć ten zestaw wyników?')) return
     setBusyKey(`group:${groupId}`)
     setError('')
     setSuccess('')
@@ -326,11 +275,11 @@ export default function AdminResultsSection({
       )
       const payload = (await res.json().catch(() => ({}))) as { ok?: boolean; message?: string }
       if (!res.ok || !payload.ok) {
-        setError(payload.message || 'Nie udało się usunąć wyników grupy.')
+        setError(payload.message || 'Nie udało się usunąć zestawu.')
         return
       }
       setGroups(prev => prev.filter(g => g.id !== groupId))
-      setSuccess('Usunięto wyniki grupy.')
+      setSuccess('Usunięto zestaw wyników.')
     } catch {
       setError('Błąd połączenia podczas usuwania.')
     } finally {
@@ -339,11 +288,7 @@ export default function AdminResultsSection({
   }
 
   const idle = busyKey === null
-
-  const categoryUploaded = categories.filter(c => c.url).length
-  const waveUploaded = waves.filter(w => w.url).length
-  const totalUploaded =
-    combined.length + categoryUploaded + waveUploaded + groups.filter(g => g.url).length
+  const totalUploaded = combined.length + groups.filter(g => g.url).length
 
   return (
     <div className={styles.regUploadCard}>
@@ -367,7 +312,7 @@ export default function AdminResultsSection({
       {!cardOpen && raceId && !loading ? (
         <p className={styles.slCardSummary}>
           {totalUploaded > 0
-            ? `Wgranych wyników: ${totalUploaded}`
+            ? `Wgranych plików: ${totalUploaded}`
             : 'Brak wgranych wyników — rozwiń, aby dodać'}
         </p>
       ) : null}
@@ -376,8 +321,7 @@ export default function AdminResultsSection({
         <>
           {!raceId ? (
             <p className={styles.formHint}>
-              Najpierw zapisz wyścig — wtedy wgrasz wyniki łączne, per kategoria, per fala oraz własne
-              grupy.
+              Najpierw zapisz wyścig — wtedy wgrasz dowolne pliki wyników oraz własne zestawy kategorii.
             </p>
           ) : null}
 
@@ -395,19 +339,19 @@ export default function AdminResultsSection({
                   <span className={styles.slSectionChevron} aria-hidden>
                     {openSections.combined ? '▼' : '▶'}
                   </span>
-                  <h4 className={styles.slSectionTitle}>Wyniki łączne (cały wyścig)</h4>
+                  <h4 className={styles.slSectionTitle}>Pliki ogólne / dowolne</h4>
                   <span className={styles.slSectionBadge}>{combined.length}</span>
                 </button>
                 {openSections.combined ? (
                   <div className={styles.slSectionBody}>
                     {combined.length === 0 ? (
-                      <p className={styles.formHint}>Brak wyników łącznych — możesz wgrać kilka plików.</p>
+                      <p className={styles.formHint}>Brak plików — możesz dodać dowolną liczbę PDF.</p>
                     ) : (
                       combined.map(f => (
                         <div key={f.id} className={styles.slRow}>
                           <div className={styles.slRowInfo}>
                             <span className={styles.slRowLabel}>
-                              {f.label?.trim() || f.fileName || 'Wyniki łączne'}
+                              {f.label?.trim() || f.fileName || 'Wyniki'}
                             </span>
                             <span className={styles.slRowMeta}>
                               <a href={f.url} target="_blank" rel="noreferrer">
@@ -435,12 +379,12 @@ export default function AdminResultsSection({
 
                     <div className={styles.slGroupForm}>
                       <label className={styles.formField}>
-                        <span className={styles.formLabel}>Etykieta (opcjonalnie)</span>
+                        <span className={styles.formLabel}>Opis (opcjonalnie)</span>
                         <input
                           className={styles.formInput}
                           value={combinedLabel}
                           onChange={e => setCombinedLabel(e.target.value)}
-                          placeholder="np. Dzień 1, Klasyfikacja generalna"
+                          placeholder="np. Klasyfikacja generalna, Dzień 1"
                         />
                       </label>
                       <div className={styles.regUploadActions}>
@@ -450,142 +394,10 @@ export default function AdminResultsSection({
                           disabled={!idle}
                           onClick={() => combinedInputRef.current?.click()}
                         >
-                          {busyKey === 'combined-new' ? 'Wgrywanie…' : 'Dodaj plik wyników łącznych'}
+                          {busyKey === 'combined-new' ? 'Wgrywanie…' : 'Dodaj plik'}
                         </button>
                       </div>
                     </div>
-                  </div>
-                ) : null}
-              </div>
-
-              <div className={styles.slSection}>
-                <button
-                  type="button"
-                  className={styles.slSectionToggle}
-                  onClick={() => toggleSection('categories')}
-                  aria-expanded={Boolean(openSections.categories)}
-                >
-                  <span className={styles.slSectionChevron} aria-hidden>
-                    {openSections.categories ? '▼' : '▶'}
-                  </span>
-                  <h4 className={styles.slSectionTitle}>Per kategoria</h4>
-                  <span className={styles.slSectionBadge}>
-                    {categoryUploaded} / {categories.length}
-                  </span>
-                </button>
-                {openSections.categories ? (
-                  <div className={styles.slSectionBody}>
-                    {categories.length === 0 ? (
-                      <p className={styles.formHint}>Brak zapisanych kategorii.</p>
-                    ) : (
-                      categories.map(c => (
-                        <div key={c.id} className={styles.slRow}>
-                          <div className={styles.slRowInfo}>
-                            <span className={styles.slRowLabel}>{c.name || 'Bez nazwy'}</span>
-                            {c.url ? (
-                              <span className={styles.slRowMeta}>
-                                <a href={c.url} target="_blank" rel="noreferrer">
-                                  Pobierz
-                                </a>
-                                {c.fileName ? ` · ${c.fileName}` : ''}
-                              </span>
-                            ) : (
-                              <span className={styles.slRowMeta}>Brak pliku</span>
-                            )}
-                          </div>
-                          <div className={styles.slRowActions}>
-                            {c.url ? (
-                              <button
-                                type="button"
-                                className={styles.btnGhost}
-                                disabled={!idle}
-                                onClick={() => void deleteSlot('category', c.id)}
-                              >
-                                {busyKey === `category:${c.id}` ? 'Usuwanie…' : 'Usuń'}
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                className={styles.btnSecondary}
-                                disabled={!idle}
-                                onClick={() => {
-                                  setPendingCategoryId(c.id)
-                                  categoryInputRef.current?.click()
-                                }}
-                              >
-                                {busyKey === `category:${c.id}` ? 'Wgrywanie…' : 'Wgraj'}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                ) : null}
-              </div>
-
-              <div className={styles.slSection}>
-                <button
-                  type="button"
-                  className={styles.slSectionToggle}
-                  onClick={() => toggleSection('waves')}
-                  aria-expanded={Boolean(openSections.waves)}
-                >
-                  <span className={styles.slSectionChevron} aria-hidden>
-                    {openSections.waves ? '▼' : '▶'}
-                  </span>
-                  <h4 className={styles.slSectionTitle}>Per fala</h4>
-                  <span className={styles.slSectionBadge}>
-                    {waveUploaded} / {waves.length}
-                  </span>
-                </button>
-                {openSections.waves ? (
-                  <div className={styles.slSectionBody}>
-                    {waves.length === 0 ? (
-                      <p className={styles.formHint}>Brak zapisanych fal startu.</p>
-                    ) : (
-                      waves.map(w => (
-                        <div key={w.id} className={styles.slRow}>
-                          <div className={styles.slRowInfo}>
-                            <span className={styles.slRowLabel}>{w.label}</span>
-                            {w.url ? (
-                              <span className={styles.slRowMeta}>
-                                <a href={w.url} target="_blank" rel="noreferrer">
-                                  Pobierz
-                                </a>
-                                {w.fileName ? ` · ${w.fileName}` : ''}
-                              </span>
-                            ) : (
-                              <span className={styles.slRowMeta}>Brak pliku</span>
-                            )}
-                          </div>
-                          <div className={styles.slRowActions}>
-                            {w.url ? (
-                              <button
-                                type="button"
-                                className={styles.btnGhost}
-                                disabled={!idle}
-                                onClick={() => void deleteSlot('wave', w.id)}
-                              >
-                                {busyKey === `wave:${w.id}` ? 'Usuwanie…' : 'Usuń'}
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                className={styles.btnSecondary}
-                                disabled={!idle}
-                                onClick={() => {
-                                  setPendingWaveId(w.id)
-                                  waveInputRef.current?.click()
-                                }}
-                              >
-                                {busyKey === `wave:${w.id}` ? 'Wgrywanie…' : 'Wgraj'}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      ))
-                    )}
                   </div>
                 ) : null}
               </div>
@@ -600,7 +412,7 @@ export default function AdminResultsSection({
                   <span className={styles.slSectionChevron} aria-hidden>
                     {openSections.groups ? '▼' : '▶'}
                   </span>
-                  <h4 className={styles.slSectionTitle}>Grupa kategorii (własna)</h4>
+                  <h4 className={styles.slSectionTitle}>Własny zestaw kategorii</h4>
                   <span className={styles.slSectionBadge}>{groups.length}</span>
                 </button>
                 {openSections.groups ? (
@@ -637,34 +449,45 @@ export default function AdminResultsSection({
 
                     {categories.length < 2 ? (
                       <p className={styles.formHint}>
-                        Potrzebujesz co najmniej dwóch kategorii, aby utworzyć grupę.
+                        Potrzebujesz co najmniej dwóch kategorii, aby utworzyć zestaw.
+                      </p>
+                    ) : availableCategories.length < 2 ? (
+                      <p className={styles.formHint}>
+                        Wszystkie kategorie są już w zestawach. Usuń zestaw, aby zwolnić kategorie.
                       </p>
                     ) : (
                       <div className={styles.slGroupForm}>
                         <p className={styles.formHint} style={{ margin: 0 }}>
-                          Wybierz kategorie, które mają iść do jednego PDF wyników, i wgraj plik.
+                          Wybierz kategorie (każdą tylko raz, w jednym zestawie) i wgraj jeden PDF.
                         </p>
                         <div className={styles.slCheckList}>
-                          {categories.map(c => (
-                            <label key={c.id} className={styles.slCheckItem}>
-                              <input
-                                type="checkbox"
-                                checked={Boolean(groupSelected[c.id])}
-                                onChange={e =>
-                                  setGroupSelected(prev => ({ ...prev, [c.id]: e.target.checked }))
-                                }
-                              />
-                              <span>{c.name || 'Bez nazwy'}</span>
-                            </label>
-                          ))}
+                          {categories.map(c => {
+                            const taken = takenCategoryIds.has(c.id)
+                            return (
+                              <label key={c.id} className={styles.slCheckItem}>
+                                <input
+                                  type="checkbox"
+                                  disabled={taken}
+                                  checked={Boolean(groupSelected[c.id])}
+                                  onChange={e =>
+                                    setGroupSelected(prev => ({ ...prev, [c.id]: e.target.checked }))
+                                  }
+                                />
+                                <span>
+                                  {c.name || 'Bez nazwy'}
+                                  {taken ? ' (już w zestawie)' : ''}
+                                </span>
+                              </label>
+                            )
+                          })}
                         </div>
                         <label className={styles.formField}>
-                          <span className={styles.formLabel}>Etykieta (opcjonalnie)</span>
+                          <span className={styles.formLabel}>Opis zestawu</span>
                           <input
                             className={styles.formInput}
                             value={groupLabel}
                             onChange={e => setGroupLabel(e.target.value)}
-                            placeholder="np. Elita M+K"
+                            placeholder="Uzupełnia się z zaznaczonych kategorii — możesz zmienić"
                           />
                         </label>
                         <div className={styles.regUploadActions}>
@@ -674,7 +497,7 @@ export default function AdminResultsSection({
                             disabled={!idle}
                             onClick={() => groupInputRef.current?.click()}
                           >
-                            {busyKey === 'group-new' ? 'Wgrywanie…' : 'Wgraj wyniki dla grupy'}
+                            {busyKey === 'group-new' ? 'Wgrywanie…' : 'Wgraj PDF dla zestawu'}
                           </button>
                         </div>
                       </div>
@@ -693,32 +516,6 @@ export default function AdminResultsSection({
             onChange={e => {
               const file = e.target.files?.[0]
               if (file) void uploadCombined(file)
-              e.target.value = ''
-            }}
-          />
-          <input
-            ref={categoryInputRef}
-            type="file"
-            accept="application/pdf"
-            style={{ display: 'none' }}
-            onChange={e => {
-              const file = e.target.files?.[0]
-              const id = pendingCategoryId
-              setPendingCategoryId(null)
-              if (file && id) void uploadSlot('category', id, file)
-              e.target.value = ''
-            }}
-          />
-          <input
-            ref={waveInputRef}
-            type="file"
-            accept="application/pdf"
-            style={{ display: 'none' }}
-            onChange={e => {
-              const file = e.target.files?.[0]
-              const id = pendingWaveId
-              setPendingWaveId(null)
-              if (file && id) void uploadSlot('wave', id, file)
               e.target.value = ''
             }}
           />

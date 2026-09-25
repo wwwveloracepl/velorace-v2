@@ -36,6 +36,14 @@ export function combinedStartlistBlobPrefix(raceSlug: string, raceYear: number):
 }
 
 /**
+ * Jeden plik listy ogólnej (wiele dozwolonych):
+ * `{root}/{year}/{raceSlugSeg}/laczna/{fileId}/`
+ */
+export function combinedStartlistFileBlobPrefix(raceSlug: string, raceYear: number, fileId: string): string {
+  return `${combinedStartlistBlobPrefix(raceSlug, raceYear)}${fileId}/`
+}
+
+/**
  * Prefix dla listy startowej per fala:
  * `{root}/{year}/{raceSlugSeg}/fale/{waveId}/`
  */

@@ -77,13 +77,54 @@ export async function GET(req: NextRequest, ctx: { params: { id: string } | Prom
       LIMIT 1
     `
     const rm = (raceMeta[0] ?? {}) as { url?: string; file_name?: string; uploaded_at?: string }
-    const combined = rm.url
-      ? {
-          url: String(rm.url),
-          fileName: String(rm.file_name ?? ''),
-          uploadedAt: String(rm.uploaded_at ?? ''),
-        }
-      : null
+
+    let combined: {
+      id: string
+      label: string
+      url: string
+      fileName: string
+      uploadedAt: string
+    }[] = []
+    try {
+      const combinedRows = await sql`
+        SELECT
+          g.id::text AS id,
+          COALESCE(g.label, '') AS label,
+          COALESCE(g.file_url, '') AS file_url,
+          COALESCE(g.file_name, '') AS file_name,
+          COALESCE(g.uploaded_at::text, '') AS uploaded_at
+        FROM race_startlist_combined_files g
+        WHERE g.race_id = ${raceId}::uuid
+        ORDER BY g.uploaded_at NULLS LAST, g.created_at
+      `
+      combined = (combinedRows as {
+        id: string
+        label: string
+        file_url: string
+        file_name: string
+        uploaded_at: string
+      }[])
+        .filter(r => r.file_url)
+        .map(r => ({
+          id: String(r.id),
+          label: String(r.label ?? ''),
+          url: String(r.file_url),
+          fileName: String(r.file_name ?? ''),
+          uploadedAt: String(r.uploaded_at ?? ''),
+        }))
+    } catch {
+      // tabela może jeszcze nie istnieć
+    }
+
+    if (rm.url && !combined.some(c => c.url === String(rm.url))) {
+      combined.unshift({
+        id: 'legacy',
+        label: '',
+        url: String(rm.url),
+        fileName: String(rm.file_name ?? ''),
+        uploadedAt: String(rm.uploaded_at ?? ''),
+      })
+    }
 
     const catRows = await sql`
       SELECT id::text AS id, name

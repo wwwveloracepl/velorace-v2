@@ -116,6 +116,24 @@ export async function POST(req: NextRequest, ctx: { params: { id: string } | Pro
     return ia - ib
   })
 
+  const takenRows = await sql`
+    SELECT gc.category_id::text AS id
+    FROM race_startlist_group_categories gc
+    JOIN race_startlist_groups g ON g.id = gc.group_id
+    WHERE g.race_id = ${raceId}::uuid
+  `
+  const taken = new Set((takenRows as { id: string }[]).map(r => String(r.id)))
+  const conflict = found.find(c => taken.has(c.id))
+  if (conflict) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message: `Kategoria „${conflict.name}” jest już w innym zestawie. Każdą kategorię można użyć tylko raz.`,
+      },
+      { status: 400 },
+    )
+  }
+
   const label = labelRaw || found.map(c => c.name).filter(Boolean).join(' + ') || 'Grupa kategorii'
   const nameCandidate =
     typeof (file as unknown as { name?: unknown }).name === 'string'

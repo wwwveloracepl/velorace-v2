@@ -4,7 +4,7 @@ import { getAuthUserFromRequest } from '@/lib/serverAuth'
 import { getDb } from '@/lib/db'
 import { getRaceResultsPdfContext } from '@/lib/raceDb'
 import { isPdfUpload, safeResultUploadFileName } from '@/lib/results'
-import { combinedStartlistBlobPrefix } from '@/lib/startlists'
+import { combinedStartlistBlobPrefix, combinedStartlistFileBlobPrefix } from '@/lib/startlists'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -21,6 +21,53 @@ async function listAllBlobsWithPrefix(prefix: string) {
     cursor = batch.cursor
   }
   return out
+}
+
+function isUuidLike(s: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s)
+}
+
+async function syncRaceStartlistColumns(sql: NonNullable<ReturnType<typeof getDb>>, raceId: string) {
+  const newest = await sql`
+    SELECT
+      COALESCE(storage_path, '') AS storage_path,
+      COALESCE(file_url, '') AS file_url,
+      COALESCE(file_name, '') AS file_name,
+      uploaded_at
+    FROM race_startlist_combined_files
+    WHERE race_id = ${raceId}::uuid
+      AND file_url IS NOT NULL
+      AND file_url <> ''
+    ORDER BY uploaded_at DESC NULLS LAST, created_at DESC
+    LIMIT 1
+  `
+  const row = newest[0] as
+    | { storage_path: string; file_url: string; file_name: string; uploaded_at: string | null }
+    | undefined
+
+  if (row?.file_url) {
+    await sql`
+      UPDATE races
+      SET
+        startlist_storage_path = ${row.storage_path || null},
+        startlist_file_url = ${row.file_url},
+        startlist_file_name = ${row.file_name || null},
+        startlist_uploaded_at = ${row.uploaded_at},
+        updated_at = NOW()
+      WHERE id = ${raceId}::uuid
+    `
+  } else {
+    await sql`
+      UPDATE races
+      SET
+        startlist_storage_path = NULL,
+        startlist_file_url = NULL,
+        startlist_file_name = NULL,
+        startlist_uploaded_at = NULL,
+        updated_at = NOW()
+      WHERE id = ${raceId}::uuid
+    `
+  }
 }
 
 export async function POST(req: NextRequest, ctx: { params: { id: string } | Promise<{ id: string }> }) {
@@ -47,6 +94,11 @@ export async function POST(req: NextRequest, ctx: { params: { id: string } | Pro
     return NextResponse.json({ ok: false, message: 'Nie znaleziono wyścigu.' }, { status: 404 })
   }
 
+  const sql = getDb()
+  if (!sql) {
+    return NextResponse.json({ ok: false, message: 'Brak DATABASE_URL.' }, { status: 503 })
+  }
+
   let formData: FormData
   try {
     formData = await req.formData()
@@ -55,6 +107,8 @@ export async function POST(req: NextRequest, ctx: { params: { id: string } | Pro
   }
 
   const file = formData.get('file')
+  const labelRaw = typeof formData.get('label') === 'string' ? String(formData.get('label')).trim() : ''
+
   if (!(file instanceof Blob)) {
     return NextResponse.json({ ok: false, message: 'Brak pliku.' }, { status: 400 })
   }
@@ -67,35 +121,34 @@ export async function POST(req: NextRequest, ctx: { params: { id: string } | Pro
     return NextResponse.json({ ok: false, message: 'Plik za duży (max 25 MB).' }, { status: 400 })
   }
 
-  const prefix = combinedStartlistBlobPrefix(raceCtx.slug, raceCtx.raceYear)
-
   try {
-    const existing = await listAllBlobsWithPrefix(prefix)
-    if (existing.length > 0) {
-      await deleteObjectsByPath(existing.map(b => b.pathname))
-    }
-
-    const pathname = `${prefix}${originalName}`
+    const inserted = await sql`
+      INSERT INTO race_startlist_combined_files (race_id, label)
+      VALUES (${raceId}::uuid, ${labelRaw})
+      RETURNING id::text AS id
+    `
+    const fileId = String((inserted[0] as { id: string }).id)
+    const folderPrefix = combinedStartlistFileBlobPrefix(raceCtx.slug, raceCtx.raceYear, fileId)
+    const pathname = `${folderPrefix}${originalName}`
     const blob = await putObject(pathname, file, { contentType: 'application/pdf' })
     const publicUrl = blob.downloadUrl || blob.url
 
-    const sql = getDb()
-    if (!sql) {
-      return NextResponse.json({ ok: false, message: 'Brak DATABASE_URL.' }, { status: 503 })
-    }
     await sql`
-      UPDATE races
+      UPDATE race_startlist_combined_files
       SET
-        startlist_storage_path = ${blob.pathname},
-        startlist_file_url = ${publicUrl},
-        startlist_file_name = ${originalName},
-        startlist_uploaded_at = NOW(),
-        updated_at = NOW()
-      WHERE id = ${raceId}::uuid
+        storage_path = ${blob.pathname},
+        file_url = ${publicUrl},
+        file_name = ${originalName},
+        uploaded_at = NOW()
+      WHERE id = ${fileId}::uuid
     `
+
+    await syncRaceStartlistColumns(sql, raceId)
 
     return NextResponse.json({
       ok: true,
+      id: fileId,
+      label: labelRaw,
       url: publicUrl,
       pathname: blob.pathname,
       fileName: originalName,
@@ -128,23 +181,64 @@ export async function DELETE(req: NextRequest, ctx: { params: { id: string } | P
     return NextResponse.json({ ok: false, message: 'Nie znaleziono wyścigu.' }, { status: 404 })
   }
 
+  const fileId = req.nextUrl.searchParams.get('fileId')?.trim() || ''
+  const legacy = req.nextUrl.searchParams.get('legacy') === '1'
+
   try {
-    const prefix = combinedStartlistBlobPrefix(raceCtx.slug, raceCtx.raceYear)
-    const existing = await listAllBlobsWithPrefix(prefix)
-    if (existing.length > 0 && hasObjectStoreConfig()) {
-      await deleteObjectsByPath(existing.map(b => b.pathname))
+    if (legacy || fileId === 'legacy') {
+      const prefix = combinedStartlistBlobPrefix(raceCtx.slug, raceCtx.raceYear)
+      if (hasObjectStoreConfig()) {
+        const existing = await listAllBlobsWithPrefix(prefix)
+        const direct = existing.filter(b => {
+          const rest = b.pathname.slice(prefix.length)
+          return rest.length > 0 && !rest.includes('/')
+        })
+        if (direct.length > 0) {
+          await deleteObjectsByPath(direct.map(b => b.pathname))
+        }
+      }
+      await sql`
+        UPDATE races
+        SET
+          startlist_storage_path = NULL,
+          startlist_file_url = NULL,
+          startlist_file_name = NULL,
+          startlist_uploaded_at = NULL,
+          updated_at = NOW()
+        WHERE id = ${raceId}::uuid
+      `
+      await syncRaceStartlistColumns(sql, raceId)
+      return NextResponse.json({ ok: true })
+    }
+
+    if (!fileId || !isUuidLike(fileId)) {
+      return NextResponse.json({ ok: false, message: 'Podaj fileId pliku do usunięcia.' }, { status: 400 })
+    }
+
+    const rows = await sql`
+      SELECT id::text AS id
+      FROM race_startlist_combined_files
+      WHERE id = ${fileId}::uuid AND race_id = ${raceId}::uuid
+      LIMIT 1
+    `
+    if (!rows.length) {
+      return NextResponse.json({ ok: false, message: 'Nie znaleziono pliku.' }, { status: 404 })
+    }
+
+    if (hasObjectStoreConfig()) {
+      const folderPrefix = combinedStartlistFileBlobPrefix(raceCtx.slug, raceCtx.raceYear, fileId)
+      const existing = await listAllBlobsWithPrefix(folderPrefix)
+      if (existing.length > 0) {
+        await deleteObjectsByPath(existing.map(b => b.pathname))
+      }
     }
 
     await sql`
-      UPDATE races
-      SET
-        startlist_storage_path = NULL,
-        startlist_file_url = NULL,
-        startlist_file_name = NULL,
-        startlist_uploaded_at = NULL,
-        updated_at = NOW()
-      WHERE id = ${raceId}::uuid
+      DELETE FROM race_startlist_combined_files
+      WHERE id = ${fileId}::uuid AND race_id = ${raceId}::uuid
     `
+
+    await syncRaceStartlistColumns(sql, raceId)
 
     return NextResponse.json({ ok: true })
   } catch (e) {

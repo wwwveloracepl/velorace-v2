@@ -225,6 +225,20 @@ CREATE TABLE race_startlist_group_categories (
 CREATE INDEX idx_race_startlist_group_categories_category
   ON race_startlist_group_categories(category_id);
 
+-- Wiele PDF list startowych ogólnych na jeden wyścig
+CREATE TABLE race_startlist_combined_files (
+  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  race_id         UUID NOT NULL REFERENCES races(id) ON DELETE CASCADE,
+  label           TEXT NOT NULL DEFAULT '',
+  storage_path    TEXT,
+  file_url        TEXT,
+  file_name       TEXT,
+  uploaded_at     TIMESTAMPTZ,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_race_startlist_combined_files_race ON race_startlist_combined_files(race_id);
+
 -- Wiele PDF wyników łącznych (ogólnych) na jeden wyścig
 CREATE TABLE race_results_combined_files (
   id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),

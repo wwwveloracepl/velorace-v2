@@ -57,8 +57,33 @@ export async function GET(req: NextRequest) {
   const sql = getDb()
 
   try {
-    let combined: { url: string; fileName: string } | null = null
+    let combined: { id: string; label: string; url: string; fileName: string }[] = []
     if (sql) {
+      try {
+        const combinedRows = await sql`
+          SELECT
+            g.id::text AS id,
+            COALESCE(g.label, '') AS label,
+            COALESCE(g.file_url, '') AS file_url,
+            COALESCE(g.file_name, '') AS file_name
+          FROM race_startlist_combined_files g
+          WHERE g.race_id = ${raceId}::uuid
+            AND g.file_url IS NOT NULL
+            AND g.file_url <> ''
+          ORDER BY g.uploaded_at NULLS LAST, g.created_at
+        `
+        combined = (combinedRows as { id: string; label: string; file_url: string; file_name: string }[]).map(
+          r => ({
+            id: String(r.id),
+            label: String(r.label ?? ''),
+            url: String(r.file_url),
+            fileName: String(r.file_name ?? ''),
+          }),
+        )
+      } catch {
+        // tabela może jeszcze nie istnieć
+      }
+
       const raceMeta = await sql`
         SELECT
           COALESCE(startlist_file_url, '') AS url,
@@ -68,8 +93,16 @@ export async function GET(req: NextRequest) {
         LIMIT 1
       `
       const rm = (raceMeta[0] ?? {}) as { url?: string; file_name?: string }
-      if (rm.url) {
-        combined = { url: String(rm.url), fileName: String(rm.file_name ?? '') }
+      if (rm.url && !combined.some(c => c.url === String(rm.url))) {
+        combined = [
+          {
+            id: 'legacy',
+            label: '',
+            url: String(rm.url),
+            fileName: String(rm.file_name ?? ''),
+          },
+          ...combined,
+        ]
       }
     }
 

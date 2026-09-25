@@ -6,12 +6,35 @@ import listStyles from './RaceStartlistDownloads.module.css'
 
 type CategoryLike = { id: string; name: string }
 
+type CombinedItem = { id: string; label: string; url: string; fileName: string }
+
 type StartlistsResponse = {
   ok?: boolean
   urls?: Record<string, string | null>
-  combined?: { url: string; fileName: string } | null
+  combined?: CombinedItem[] | { url: string; fileName: string } | null
   waves?: { id: string; label: string; url: string; fileName: string }[]
   groups?: { id: string; label: string; url: string; fileName: string }[]
+}
+
+function normalizeCombined(
+  raw: StartlistsResponse['combined'],
+  fallbackUrl?: string,
+): CombinedItem[] {
+  if (Array.isArray(raw)) {
+    return raw.filter(f => f?.url).map(f => ({
+      id: f.id || f.url,
+      label: f.label || '',
+      url: f.url,
+      fileName: f.fileName || '',
+    }))
+  }
+  if (raw && typeof raw === 'object' && 'url' in raw && raw.url) {
+    return [{ id: 'legacy', label: '', url: raw.url, fileName: raw.fileName || '' }]
+  }
+  if (fallbackUrl) {
+    return [{ id: 'legacy', label: '', url: fallbackUrl, fileName: '' }]
+  }
+  return []
 }
 
 export default function RaceStartlistsSection({
@@ -25,8 +48,8 @@ export default function RaceStartlistsSection({
 }) {
   const [loading, setLoading] = useState(true)
   const [urls, setUrls] = useState<Record<string, string | null>>({})
-  const [combined, setCombined] = useState<{ url: string; fileName: string } | null>(
-    combinedStartlistUrl ? { url: combinedStartlistUrl, fileName: '' } : null,
+  const [combined, setCombined] = useState<CombinedItem[]>(
+    combinedStartlistUrl ? [{ id: 'legacy', label: '', url: combinedStartlistUrl, fileName: '' }] : [],
   )
   const [waves, setWaves] = useState<{ id: string; label: string; url: string }[]>([])
   const [groups, setGroups] = useState<{ id: string; label: string; url: string }[]>([])
@@ -44,11 +67,11 @@ export default function RaceStartlistsSection({
           setUrls({})
           setWaves([])
           setGroups([])
-          if (!combinedStartlistUrl) setCombined(null)
+          setCombined(normalizeCombined(null, combinedStartlistUrl))
           return
         }
         setUrls(d.urls ?? {})
-        setCombined(d.combined ?? (combinedStartlistUrl ? { url: combinedStartlistUrl, fileName: '' } : null))
+        setCombined(normalizeCombined(d.combined, combinedStartlistUrl))
         setWaves((d.waves ?? []).map(w => ({ id: w.id, label: w.label, url: w.url })))
         setGroups((d.groups ?? []).map(g => ({ id: g.id, label: g.label, url: g.url })))
       })
@@ -57,7 +80,7 @@ export default function RaceStartlistsSection({
         setUrls({})
         setWaves([])
         setGroups([])
-        if (!combinedStartlistUrl) setCombined(null)
+        setCombined(normalizeCombined(null, combinedStartlistUrl))
       })
       .finally(() => {
         if (cancelled) return
@@ -76,7 +99,7 @@ export default function RaceStartlistsSection({
   }, [categories, urls])
 
   const hasAny =
-    Boolean(combined?.url) || publishedCategories.length > 0 || waves.length > 0 || groups.length > 0
+    combined.length > 0 || publishedCategories.length > 0 || waves.length > 0 || groups.length > 0
 
   if (loading && !combinedStartlistUrl) return null
   if (!hasAny) return null
@@ -86,18 +109,22 @@ export default function RaceStartlistsSection({
       <h2 className={styles.cardTitle}>Pobierz listy startowe</h2>
       <div className={styles.downloadsBody}>
         <div className={listStyles.list}>
-          {combined?.url ? (
-            <a href={combined.url} target="_blank" rel="noreferrer" className={listStyles.item}>
-              <span className={listStyles.label}>Lista łączna</span>
+          {combined.map((f, i) => (
+            <a key={f.id} href={f.url} target="_blank" rel="noreferrer" className={listStyles.item}>
+              <span className={listStyles.label}>
+                {f.label?.trim() ||
+                  (combined.length > 1 ? `Lista startowa ${i + 1}` : 'Lista startowa')}
+              </span>
               <span className={listStyles.action}>Pobierz</span>
             </a>
-          ) : null}
+          ))}
           {groups.map(g => (
             <a key={g.id} href={g.url} target="_blank" rel="noreferrer" className={listStyles.item}>
               <span className={listStyles.label}>{g.label}</span>
               <span className={listStyles.action}>Pobierz</span>
             </a>
           ))}
+          {/* Stare pliki per fala / per kategoria — zostają widoczne */}
           {waves.map(w => (
             <a key={w.id} href={w.url} target="_blank" rel="noreferrer" className={listStyles.item}>
               <span className={listStyles.label}>{w.label}</span>

@@ -112,7 +112,7 @@ export default function AdminAddRaceTab() {
           const set = new Set(w.categoryKeys)
           if (checked) set.add(catKey)
           else set.delete(catKey)
-          return { ...w, categoryKeys: [...set] }
+          return { ...w, categoryKeys: Array.from(set) }
         }
         if (checked) {
           return { ...w, categoryKeys: w.categoryKeys.filter(k => k !== catKey) }
@@ -166,8 +166,8 @@ export default function AdminAddRaceTab() {
           name: c.name.trim(),
           gender: c.gender || null,
           entry_fee_pln: parseOptionalNumber(c.entry_fee_pln),
-          spots_total: parseOptionalInt(c.spots_total),
-          bib_start: parseOptionalInt(c.bib_start),
+          spots_total: null,
+          bib_start: null,
           display_order: i,
           distance_km: parseOptionalNumber(c.distance_km),
           lap_count: parseOptionalInt(c.lap_count),
@@ -180,7 +180,7 @@ export default function AdminAddRaceTab() {
       const keyToIndex = new Map(categories.map((c, i) => [c.key, i]))
       const wavesPayload = startWaves
         .map(w => ({
-          start_time: w.start_time.trim(),
+          start_time: w.startTime.trim(),
           category_indexes: w.categoryKeys
             .map(k => keyToIndex.get(k))
             .filter((x): x is number => typeof x === 'number'),
