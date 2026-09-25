@@ -100,7 +100,8 @@ export async function GET(req: NextRequest) {
           LIMIT 1
         `
         const rm = (raceMeta[0] ?? {}) as { url?: string; file_name?: string }
-        if (rm.url && !combined.some(c => c.url === String(rm.url))) {
+        // Lustro races.results_combined_* — tylko gdy brak wpisów w tabeli plików łącznych.
+        if (combined.length === 0 && rm.url) {
           combined = [
             {
               id: 'legacy',
@@ -108,7 +109,6 @@ export async function GET(req: NextRequest) {
               url: String(rm.url),
               fileName: String(rm.file_name ?? ''),
             },
-            ...combined,
           ]
         }
       }

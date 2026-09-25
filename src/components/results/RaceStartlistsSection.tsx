@@ -48,15 +48,17 @@ export default function RaceStartlistsSection({
 }) {
   const [loading, setLoading] = useState(true)
   const [urls, setUrls] = useState<Record<string, string | null>>({})
-  const [combined, setCombined] = useState<CombinedItem[]>(
-    combinedStartlistUrl ? [{ id: 'legacy', label: '', url: combinedStartlistUrl, fileName: '' }] : [],
-  )
+  const [combined, setCombined] = useState<CombinedItem[]>([])
   const [waves, setWaves] = useState<{ id: string; label: string; url: string }[]>([])
   const [groups, setGroups] = useState<{ id: string; label: string; url: string }[]>([])
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
+    setCombined([])
+    setWaves([])
+    setGroups([])
+    setUrls({})
 
     const q = new URLSearchParams({ raceId })
     fetch(`/api/startlists?${q}`, { cache: 'no-store' })
@@ -71,7 +73,7 @@ export default function RaceStartlistsSection({
           return
         }
         setUrls(d.urls ?? {})
-        setCombined(normalizeCombined(d.combined, combinedStartlistUrl))
+        setCombined(normalizeCombined(d.combined))
         setWaves((d.waves ?? []).map(w => ({ id: w.id, label: w.label, url: w.url })))
         setGroups((d.groups ?? []).map(g => ({ id: g.id, label: g.label, url: g.url })))
       })
@@ -101,7 +103,7 @@ export default function RaceStartlistsSection({
   const hasAny =
     combined.length > 0 || publishedCategories.length > 0 || waves.length > 0 || groups.length > 0
 
-  if (loading && !combinedStartlistUrl) return null
+  if (loading) return null
   if (!hasAny) return null
 
   return (

@@ -36,10 +36,9 @@ function raceDateBadgeParts(raceDate: string): { day: string; month: string; dat
 
 type AdminRaceListTabProps = {
   onOpenEditRace?: (race: AdminDbRaceListItem) => void | Promise<void>
-  onOpenResultsRace?: (race: AdminDbRaceListItem) => void | Promise<void>
 }
 
-export default function AdminRaceListTab({ onOpenEditRace, onOpenResultsRace }: AdminRaceListTabProps) {
+export default function AdminRaceListTab({ onOpenEditRace }: AdminRaceListTabProps) {
   const [listCalendarYear] = useState(() => new Date().getFullYear())
   const [races, setRaces] = useState<AdminDbRaceListItem[] | null>(null)
   const [err, setErr] = useState<string | null>(null)
@@ -82,8 +81,8 @@ export default function AdminRaceListTab({ onOpenEditRace, onOpenResultsRace }: 
   return (
     <div className={styles.panel}>
       <p className={styles.intro}>
-        Wyścigi z bieżącego roku kalendarzowego ({listCalendarYear}). Edytuj dane lub wstaw wyniki z jednej listy.
-        Nowy wyścig dodasz w zakładce „Dodaj wyścig”. Starsze edycje znajdziesz w „Historia”.
+        Wyścigi z bieżącego roku kalendarzowego ({listCalendarYear}). Wyniki i listy startowe wgrywasz po wejściu w
+        „Edytuj”. Nowy wyścig dodasz w zakładce „Dodaj wyścig”. Starsze edycje znajdziesz w „Historia”.
       </p>
 
       {err && (
@@ -144,13 +143,6 @@ export default function AdminRaceListTab({ onOpenEditRace, onOpenResultsRace }: 
                     onClick={() => void onOpenEditRace?.(race)}
                   >
                     Edytuj
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.btnSecondary}
-                    onClick={() => void onOpenResultsRace?.(race)}
-                  >
-                    Dodaj wyniki
                   </button>
                 </div>
               </li>

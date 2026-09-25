@@ -715,9 +715,9 @@ const AdminEditRaceTab = forwardRef<AdminEditRaceTabHandle>(function AdminEditRa
       {!editingId ? (
       <div className={styles.panel}>
         <p className={styles.intro}>
-          Lista zawiera tylko wyścigi z datą w bieżącym roku kalendarzowym ({listCalendarYear}). Starsze edycje
-          znajdziesz w zakładce „Historia”. Po zapisie wyścig zostaje na liście tylko wtedy, gdy data wyścigu nadal
-          przypada do tego roku.
+          Lista zawiera tylko wyścigi z datą w bieżącym roku kalendarzowym ({listCalendarYear}). Po kliknięciu
+          „Edytuj” możesz zmienić dane wyścigu oraz wgrać regulamin, listy startowe i wyniki. Starsze edycje
+          znajdziesz w zakładce „Historia”.
         </p>
         {listErr && (
           <p className={styles.formError} role="alert">

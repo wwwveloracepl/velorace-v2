@@ -97,22 +97,22 @@
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  width: 36px;
-  height: 36px;
+  width: 42px;
+  height: 42px;
   margin-top: -4px;
-  color: var(--stone);
+  color: var(--red, #c41e3a);
   border-radius: 4px;
   transition: color 0.15s, background 0.15s;
 }
 
 .detailsIcon:hover {
-  color: var(--red-b);
+  color: var(--red-b, #e04a5f);
   background: rgba(212, 0, 0, 0.12);
 }
 
 .detailsIconSvg {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
 }
 
 .meta {

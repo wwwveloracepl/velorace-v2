@@ -116,7 +116,7 @@ export async function GET(req: NextRequest, ctx: { params: { id: string } | Prom
       // tabela może jeszcze nie istnieć
     }
 
-    if (rm.url && !combined.some(c => c.url === String(rm.url))) {
+    if (combined.length === 0 && rm.url) {
       combined.unshift({
         id: 'legacy',
         label: '',

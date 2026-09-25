@@ -58,15 +58,17 @@ export default function RaceResultsDownloads({
   const [flexLoading, setFlexLoading] = useState(true)
   const [categoryUrls, setCategoryUrls] = useState<Record<string, string | null>>({})
   const [apiCategories, setApiCategories] = useState<CategoryLike[]>([])
-  const [combined, setCombined] = useState<CombinedItem[]>(
-    combinedResultsUrl ? [{ id: 'legacy', label: '', url: combinedResultsUrl, fileName: '' }] : [],
-  )
+  const [combined, setCombined] = useState<CombinedItem[]>([])
   const [waves, setWaves] = useState<{ id: string; label: string; url: string }[]>([])
   const [groups, setGroups] = useState<{ id: string; label: string; url: string }[]>([])
 
   useEffect(() => {
     let cancelled = false
     setFlexLoading(true)
+    setCombined([])
+    setWaves([])
+    setGroups([])
+    setCategoryUrls({})
 
     const q = new URLSearchParams({ raceId })
     fetch(`/api/results-files?${q}`, { cache: 'no-store' })
@@ -83,7 +85,7 @@ export default function RaceResultsDownloads({
         }
         setCategoryUrls(d.urls ?? {})
         setApiCategories(Array.isArray(d.categories) ? d.categories : [])
-        setCombined(normalizeCombined(d.combined, combinedResultsUrl))
+        setCombined(normalizeCombined(d.combined))
         setWaves((d.waves ?? []).map(w => ({ id: w.id, label: w.label, url: w.url })))
         setGroups((d.groups ?? []).map(g => ({ id: g.id, label: g.label, url: g.url })))
       })
@@ -127,7 +129,7 @@ export default function RaceResultsDownloads({
   const hasFlexible =
     combined.length > 0 || publishedCategories.length > 0 || waves.length > 0 || groups.length > 0
   const hasLegacy = legacyRows.length > 0
-  const loading = (flexLoading || legacyLoading) && !combinedResultsUrl
+  const loading = flexLoading || legacyLoading
 
   if (loading) {
     return <p className={styles.message}>Ładowanie listy wyników…</p>

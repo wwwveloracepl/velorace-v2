@@ -93,7 +93,9 @@ export async function GET(req: NextRequest) {
         LIMIT 1
       `
       const rm = (raceMeta[0] ?? {}) as { url?: string; file_name?: string }
-      if (rm.url && !combined.some(c => c.url === String(rm.url))) {
+      // Kolumna races.startlist_* to lustro najnowszego pliku łącznego — nie doklejaj jej,
+      // gdy są już wpisy w race_startlist_combined_files (unikamy „Lista startowa” bez opisu).
+      if (combined.length === 0 && rm.url) {
         combined = [
           {
             id: 'legacy',
@@ -101,7 +103,6 @@ export async function GET(req: NextRequest) {
             url: String(rm.url),
             fileName: String(rm.file_name ?? ''),
           },
-          ...combined,
         ]
       }
     }

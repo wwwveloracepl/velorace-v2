@@ -39,11 +39,10 @@ export type AdminHistoryTabHandle = {
 
 type AdminHistoryTabProps = {
   onOpenEditRace?: (race: AdminDbRaceListItem) => void | Promise<void>
-  onOpenResultsRace?: (race: AdminDbRaceListItem) => void | Promise<void>
 }
 
 const AdminHistoryTab = forwardRef<AdminHistoryTabHandle, AdminHistoryTabProps>(function AdminHistoryTab(
-  { onOpenEditRace, onOpenResultsRace },
+  { onOpenEditRace },
   ref,
 ) {
   const [races, setRaces] = useState<AdminDbRaceListItem[] | null>(null)
@@ -115,7 +114,7 @@ const AdminHistoryTab = forwardRef<AdminHistoryTabHandle, AdminHistoryTabProps>(
     <div className={styles.panel}>
       <p className={styles.intro}>
         Archiwum: tylko lata wcześniejsze niż bieżący rok kalendarzowy ({nowY}). Wyścigi z bieżącego roku edytujesz w
-        zakładce „Edytuj wyścig”. Widok listy jest taki sam jak w edycji.
+        zakładce „Lista wyścigów”.
       </p>
 
       {err && (
@@ -147,7 +146,7 @@ const AdminHistoryTab = forwardRef<AdminHistoryTabHandle, AdminHistoryTabProps>(
 
       {races !== null && years.length === 0 && !err && raceList.length > 0 && (
         <p className={styles.placeholder}>
-          Brak wyścigów z datą sprzed roku {nowY} — wszystkie znane terminy są w bieżącym roku (patrz „Edytuj wyścig”).
+          Brak wyścigów z datą sprzed roku {nowY} — wszystkie znane terminy są w bieżącym roku (patrz „Lista wyścigów”).
         </p>
       )}
       {races !== null && years.length === 0 && !err && raceList.length === 0 && (
@@ -204,13 +203,6 @@ const AdminHistoryTab = forwardRef<AdminHistoryTabHandle, AdminHistoryTabProps>(
                     onClick={() => void onOpenEditRace?.(race)}
                   >
                     Edytuj wyścig
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.btnSecondary}
-                    onClick={() => void onOpenResultsRace?.(race)}
-                  >
-                    Wstaw wyniki
                   </button>
                 </div>
               </li>

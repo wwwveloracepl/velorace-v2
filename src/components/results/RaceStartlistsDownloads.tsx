@@ -52,9 +52,7 @@ export default function RaceStartlistsDownloads({
   const [error, setError] = useState<string | null>(null)
   const [urls, setUrls] = useState<Record<string, string | null>>({})
   const [apiCategories, setApiCategories] = useState<CategoryLike[]>([])
-  const [combined, setCombined] = useState<CombinedItem[]>(
-    combinedStartlistUrl ? [{ id: 'legacy', label: '', url: combinedStartlistUrl, fileName: '' }] : [],
-  )
+  const [combined, setCombined] = useState<CombinedItem[]>([])
   const [waves, setWaves] = useState<{ id: string; label: string; url: string }[]>([])
   const [groups, setGroups] = useState<{ id: string; label: string; url: string }[]>([])
 
@@ -62,6 +60,10 @@ export default function RaceStartlistsDownloads({
     let cancelled = false
     setLoading(true)
     setError(null)
+    setCombined([])
+    setWaves([])
+    setGroups([])
+    setUrls({})
 
     const q = new URLSearchParams({ raceId })
     fetch(`/api/startlists?${q}`, { cache: 'no-store' })
@@ -79,7 +81,8 @@ export default function RaceStartlistsDownloads({
         }
         setUrls(d.urls ?? {})
         setApiCategories(Array.isArray(d.categories) ? d.categories : [])
-        setCombined(normalizeCombined(d.combined, combinedStartlistUrl))
+        // Nie doklejaj legacy startlistUrl — API już zwraca pliki łączne / zestawy.
+        setCombined(normalizeCombined(d.combined))
         setWaves((d.waves ?? []).map(w => ({ id: w.id, label: w.label, url: w.url })))
         setGroups((d.groups ?? []).map(g => ({ id: g.id, label: g.label, url: g.url })))
       })
@@ -113,7 +116,7 @@ export default function RaceStartlistsDownloads({
   const hasAny =
     combined.length > 0 || publishedCategories.length > 0 || waves.length > 0 || groups.length > 0
 
-  if (loading && !combinedStartlistUrl) {
+  if (loading) {
     return <p className={styles.message}>Ładowanie list startowych…</p>
   }
 

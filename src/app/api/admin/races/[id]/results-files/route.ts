@@ -106,8 +106,8 @@ export async function GET(req: NextRequest, ctx: { params: { id: string } | Prom
         uploadedAt: String(r.uploaded_at ?? ''),
       }))
 
-    // Legacy: plik tylko w kolumnach races (sprzed multi) — pokaż jeśli nie ma jeszcze w tabeli
-    if (rm.url && !combined.some(c => c.url === String(rm.url))) {
+    // Legacy: plik tylko w kolumnach races (sprzed multi) — tylko gdy brak wpisów w tabeli.
+    if (combined.length === 0 && rm.url) {
       combined.unshift({
         id: 'legacy',
         label: '',
