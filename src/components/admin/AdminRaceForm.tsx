@@ -12,7 +12,6 @@ import {
 } from './adminRaceFormShared'
 import type { CategoryTemplate } from '@/lib/types'
 import RegistrationDateTimeBlock from '@/components/admin/RegistrationDateTimeBlock'
-import AdminStartlistUpload from '@/components/admin/AdminStartlistUpload'
 
 function WaveStartTimeField({
   waveKey,
@@ -105,9 +104,6 @@ export type AdminRaceFormProps = {
   submitting: boolean
   invalidCategoryKeys?: string[]
   categoryRequiredError?: boolean
-  raceId?: string | null
-  startlistQueueByCategoryKey?: Record<string, { file: File; fileName: string } | undefined>
-  onStartlistQueueChange?: (categoryKey: string, next: { file: File; fileName: string } | null) => void
 }
 
 export default function AdminRaceForm({
@@ -134,9 +130,6 @@ export default function AdminRaceForm({
   submitting,
   invalidCategoryKeys = [],
   categoryRequiredError = false,
-  raceId = null,
-  startlistQueueByCategoryKey = {},
-  onStartlistQueueChange,
 }: AdminRaceFormProps) {
   const categoriesWithNames = categories.filter(c => c.name.trim())
   const invalidCategoryKeySet = new Set(invalidCategoryKeys)
@@ -394,17 +387,6 @@ export default function AdminRaceForm({
                     />
                   </label>
                 </div>
-
-                <AdminStartlistUpload
-                  raceId={raceId}
-                  categoryId={c.dbId ?? null}
-                  queued={startlistQueueByCategoryKey[c.key] ?? null}
-                  onQueueChange={
-                    onStartlistQueueChange
-                      ? next => onStartlistQueueChange(c.key, next)
-                      : undefined
-                  }
-                />
               </div>
             )}
           </div>

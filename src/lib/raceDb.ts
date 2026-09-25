@@ -93,6 +93,9 @@ function rowToRace(row: Record<string, unknown>): Race {
     lapsDistanceKm: lapsDistanceKm != null && Number.isFinite(lapsDistanceKm) ? lapsDistanceKm : undefined,
     entryFeePln: entryFeePln != null && Number.isFinite(entryFeePln) ? entryFeePln : undefined,
     regulationUrl: row.regulation_file_url != null ? String(row.regulation_file_url) : undefined,
+    startlistUrl: row.startlist_file_url != null ? String(row.startlist_file_url) : undefined,
+    combinedResultsUrl:
+      row.results_combined_file_url != null ? String(row.results_combined_file_url) : undefined,
   }
 }
 
@@ -122,6 +125,8 @@ export async function listRacesFromDatabase(): Promise<Race[]> {
       COALESCE(fc.clapsdist, r.laps_distance_km) AS laps_distance_km,
       COALESCE(fc.cfee, r.entry_fee_pln) AS entry_fee_pln,
       r.regulation_file_url,
+      r.startlist_file_url,
+      r.results_combined_file_url,
       0::int AS spots_taken
     FROM races r
     LEFT JOIN LATERAL (
@@ -174,6 +179,8 @@ export async function listHomePageRacesCurrentYear(): Promise<Race[]> {
         COALESCE(fc.clapsdist, r.laps_distance_km) AS laps_distance_km,
         COALESCE(fc.cfee, r.entry_fee_pln) AS entry_fee_pln,
         r.regulation_file_url,
+        r.startlist_file_url,
+        r.results_combined_file_url,
         0::int AS spots_taken
       FROM races r
       LEFT JOIN LATERAL (
@@ -228,6 +235,8 @@ export async function listHomePageFinishedRacesCurrentYear(): Promise<Race[]> {
         COALESCE(fc.clapsdist, r.laps_distance_km) AS laps_distance_km,
         COALESCE(fc.cfee, r.entry_fee_pln) AS entry_fee_pln,
         r.regulation_file_url,
+        r.startlist_file_url,
+        r.results_combined_file_url,
         0::int AS spots_taken
       FROM races r
       LEFT JOIN LATERAL (
@@ -286,6 +295,8 @@ export async function getRaceByIdFromDatabase(raceId: string): Promise<Race | nu
       COALESCE(fc.clapsdist, r.laps_distance_km) AS laps_distance_km,
       COALESCE(fc.cfee, r.entry_fee_pln) AS entry_fee_pln,
       r.regulation_file_url,
+      r.startlist_file_url,
+      r.results_combined_file_url,
       0::int AS spots_taken
     FROM races r
     LEFT JOIN LATERAL (
@@ -1029,6 +1040,12 @@ export type AdminRaceEditDetail = {
   regulation_file_url: string
   regulation_file_name: string
   regulation_uploaded_at: string
+  startlist_file_url: string
+  startlist_file_name: string
+  startlist_uploaded_at: string
+  results_combined_file_url: string
+  results_combined_file_name: string
+  results_combined_uploaded_at: string
   categories: (AdminRaceCategoryInput & { id: string })[]
   startWaves: AdminStartWaveInput[]
 }
@@ -1070,7 +1087,13 @@ export async function getAdminRaceForEdit(raceId: string): Promise<AdminRaceEdit
       COALESCE(r.cover_image_url, '') AS cover_image_url,
       COALESCE(r.regulation_file_url, '') AS regulation_file_url,
       COALESCE(r.regulation_file_name, '') AS regulation_file_name,
-      COALESCE(r.regulation_uploaded_at::text, '') AS regulation_uploaded_at
+      COALESCE(r.regulation_uploaded_at::text, '') AS regulation_uploaded_at,
+      COALESCE(r.startlist_file_url, '') AS startlist_file_url,
+      COALESCE(r.startlist_file_name, '') AS startlist_file_name,
+      COALESCE(r.startlist_uploaded_at::text, '') AS startlist_uploaded_at,
+      COALESCE(r.results_combined_file_url, '') AS results_combined_file_url,
+      COALESCE(r.results_combined_file_name, '') AS results_combined_file_name,
+      COALESCE(r.results_combined_uploaded_at::text, '') AS results_combined_uploaded_at
     FROM races r
     WHERE r.id = ${raceId}::uuid
     LIMIT 1
@@ -1187,6 +1210,12 @@ export async function getAdminRaceForEdit(raceId: string): Promise<AdminRaceEdit
     regulation_file_url: String(rr.regulation_file_url ?? ''),
     regulation_file_name: String(rr.regulation_file_name ?? ''),
     regulation_uploaded_at: String(rr.regulation_uploaded_at ?? ''),
+    startlist_file_url: String(rr.startlist_file_url ?? ''),
+    startlist_file_name: String(rr.startlist_file_name ?? ''),
+    startlist_uploaded_at: String(rr.startlist_uploaded_at ?? ''),
+    results_combined_file_url: String(rr.results_combined_file_url ?? ''),
+    results_combined_file_name: String(rr.results_combined_file_name ?? ''),
+    results_combined_uploaded_at: String(rr.results_combined_uploaded_at ?? ''),
     categories,
     startWaves,
   }

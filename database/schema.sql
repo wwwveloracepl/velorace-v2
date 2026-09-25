@@ -137,6 +137,14 @@ CREATE TABLE races (
   regulation_file_url   TEXT,
   regulation_file_name TEXT,
   regulation_uploaded_at TIMESTAMPTZ,
+  startlist_storage_path TEXT,
+  startlist_file_url   TEXT,
+  startlist_file_name TEXT,
+  startlist_uploaded_at TIMESTAMPTZ,
+  results_combined_storage_path TEXT,
+  results_combined_file_url   TEXT,
+  results_combined_file_name TEXT,
+  results_combined_uploaded_at TIMESTAMPTZ,
   created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -193,6 +201,66 @@ CREATE TABLE race_start_wave_categories (
 
 CREATE UNIQUE INDEX idx_race_start_wave_categories_one_wave_per_category
   ON race_start_wave_categories(category_id);
+
+-- Własne grupy kategorii z jedną listą startową (PDF)
+CREATE TABLE race_startlist_groups (
+  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  race_id         UUID NOT NULL REFERENCES races(id) ON DELETE CASCADE,
+  label           TEXT NOT NULL,
+  storage_path    TEXT,
+  file_url        TEXT,
+  file_name       TEXT,
+  uploaded_at     TIMESTAMPTZ,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_race_startlist_groups_race ON race_startlist_groups(race_id);
+
+CREATE TABLE race_startlist_group_categories (
+  group_id        UUID NOT NULL REFERENCES race_startlist_groups(id) ON DELETE CASCADE,
+  category_id     UUID NOT NULL REFERENCES race_categories(id) ON DELETE CASCADE,
+  PRIMARY KEY (group_id, category_id)
+);
+
+CREATE INDEX idx_race_startlist_group_categories_category
+  ON race_startlist_group_categories(category_id);
+
+-- Wiele PDF wyników łącznych (ogólnych) na jeden wyścig
+CREATE TABLE race_results_combined_files (
+  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  race_id         UUID NOT NULL REFERENCES races(id) ON DELETE CASCADE,
+  label           TEXT NOT NULL DEFAULT '',
+  storage_path    TEXT,
+  file_url        TEXT,
+  file_name       TEXT,
+  uploaded_at     TIMESTAMPTZ,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_race_results_combined_files_race ON race_results_combined_files(race_id);
+
+-- Własne grupy kategorii z jednym PDF wyników
+CREATE TABLE race_results_groups (
+  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  race_id         UUID NOT NULL REFERENCES races(id) ON DELETE CASCADE,
+  label           TEXT NOT NULL,
+  storage_path    TEXT,
+  file_url        TEXT,
+  file_name       TEXT,
+  uploaded_at     TIMESTAMPTZ,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_race_results_groups_race ON race_results_groups(race_id);
+
+CREATE TABLE race_results_group_categories (
+  group_id        UUID NOT NULL REFERENCES race_results_groups(id) ON DELETE CASCADE,
+  category_id     UUID NOT NULL REFERENCES race_categories(id) ON DELETE CASCADE,
+  PRIMARY KEY (group_id, category_id)
+);
+
+CREATE INDEX idx_race_results_group_categories_category
+  ON race_results_group_categories(category_id);
 
 -- ── registrations ─────────────────────────────────────────────
 CREATE TABLE registrations (

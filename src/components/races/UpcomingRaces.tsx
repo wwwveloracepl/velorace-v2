@@ -64,7 +64,7 @@ export default async function UpcomingRaces({
     <>
       <Widget
         title="Wyścigi nadchodzące"
-        moreLabel={showMoreLinks ? 'Cały kalendarz →' : undefined}
+        moreLabel={showMoreLinks ? 'Pokaż cały kalendarz →' : undefined}
         moreHref={showMoreLinks ? '/kalendarz' : undefined}
       >
         {races.length === 0 ? (
@@ -110,15 +110,17 @@ export default async function UpcomingRaces({
                   raceId={race.id}
                   className={styles.regulationLink}
                   label="Wyniki"
+                  combinedResultsUrl={race.combinedResultsUrl}
                 />
                 <StartlistsDownloadLink
                   raceId={race.id}
                   className={styles.regulationLink}
                   label="Listy startowe"
+                  startlistUrl={race.startlistUrl}
                 />
                 {race.regulationUrl ? (
                   <a href={race.regulationUrl} className={styles.regulationLink} target="_blank" rel="noreferrer">
-                    Pobierz regulamin
+                    Regulamin
                   </a>
                 ) : null}
               </div>
@@ -129,7 +131,7 @@ export default async function UpcomingRaces({
 
       <Widget
         title="Wyścigi zakończone"
-        moreLabel={showMoreLinks ? 'Cały kalendarz →' : undefined}
+        moreLabel={showMoreLinks ? 'Pokaż cały kalendarz →' : undefined}
         moreHref={showMoreLinks ? '/kalendarz' : undefined}
       >
         {finishedRaces.length === 0 ? <p className={styles.empty}>Brak zakończonych wyścigów w bieżącym roku.</p> : null}
@@ -170,15 +172,17 @@ export default async function UpcomingRaces({
                   raceId={race.id}
                   className={styles.regulationLink}
                   label="Wyniki"
+                  combinedResultsUrl={race.combinedResultsUrl}
                 />
                 <StartlistsDownloadLink
                   raceId={race.id}
                   className={styles.regulationLink}
                   label="Listy startowe"
+                  startlistUrl={race.startlistUrl}
                 />
                 {race.regulationUrl ? (
                   <a href={race.regulationUrl} className={styles.regulationLink} target="_blank" rel="noreferrer">
-                    Pobierz regulamin
+                    Regulamin
                   </a>
                 ) : null}
               </div>

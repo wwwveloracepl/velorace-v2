@@ -4,13 +4,15 @@ import { useCallback, useRef, useState } from 'react'
 import AdminAddRaceTab from '@/components/admin/AdminAddRaceTab'
 import AdminEditRaceTab, { type AdminEditRaceTabHandle } from '@/components/admin/AdminEditRaceTab'
 import AdminHistoryTab, { type AdminHistoryTabHandle } from '@/components/admin/AdminHistoryTab'
+import AdminRaceListTab from '@/components/admin/AdminRaceListTab'
 import AdminResultsTab, { type AdminResultsTabHandle } from '@/components/admin/AdminResultsTab'
 import type { AdminDbRaceListItem } from '@/lib/raceDb'
 import styles from './AdminDashboard.module.css'
 
-type TabId = 'race' | 'edit' | 'results' | 'history'
+type TabId = 'list' | 'race' | 'edit' | 'results' | 'history'
 
 const TABS: { id: TabId; label: string }[] = [
+  { id: 'list', label: 'Lista wyścigów' },
   { id: 'race', label: 'Dodaj wyścig' },
   { id: 'edit', label: 'Edytuj wyścig' },
   { id: 'results', label: 'Wstaw wyniki' },
@@ -18,7 +20,7 @@ const TABS: { id: TabId; label: string }[] = [
 ]
 
 export default function AdminDashboard() {
-  const [tab, setTab] = useState<TabId>('race')
+  const [tab, setTab] = useState<TabId>('list')
   const editRef = useRef<AdminEditRaceTabHandle>(null)
   const resultsRef = useRef<AdminResultsTabHandle>(null)
   const historyRef = useRef<AdminHistoryTabHandle>(null)
@@ -40,7 +42,7 @@ export default function AdminDashboard() {
     [tab],
   )
 
-  const openEditFromHistory = useCallback(
+  const openEditRace = useCallback(
     async (race: AdminDbRaceListItem) => {
       if (tab === 'edit') {
         await editRef.current?.openRace(race)
@@ -54,7 +56,7 @@ export default function AdminDashboard() {
     [tab],
   )
 
-  const openResultsFromHistory = useCallback(
+  const openResultsRace = useCallback(
     (race: AdminDbRaceListItem) => {
       if (tab === 'results') {
         resultsRef.current?.openRace(race)
@@ -85,14 +87,17 @@ export default function AdminDashboard() {
         ))}
       </div>
 
+      {tab === 'list' && (
+        <AdminRaceListTab onOpenEditRace={openEditRace} onOpenResultsRace={openResultsRace} />
+      )}
       {tab === 'race' && <AdminAddRaceTab />}
       {tab === 'edit' && <AdminEditRaceTab ref={editRef} />}
       {tab === 'results' && <AdminResultsTab ref={resultsRef} />}
       {tab === 'history' && (
         <AdminHistoryTab
           ref={historyRef}
-          onOpenEditRace={openEditFromHistory}
-          onOpenResultsRace={openResultsFromHistory}
+          onOpenEditRace={openEditRace}
+          onOpenResultsRace={openResultsRace}
         />
       )}
     </div>

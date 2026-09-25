@@ -22,6 +22,8 @@ import { useCategoryTemplates } from '@/hooks/useCategoryTemplates'
 import type { AdminDbRaceListItem, AdminRaceEditDetail } from '@/lib/raceDb'
 import AdminFeedbackToast from '@/components/admin/AdminFeedbackToast'
 import AdminRegulationUpload from '@/components/admin/AdminRegulationUpload'
+import AdminStartlistsSection from '@/components/admin/AdminStartlistsSection'
+import AdminResultsSection from '@/components/admin/AdminResultsSection'
 import styles from './AdminDashboard.module.css'
 
 const STATUS_LABEL: Record<string, string> = {
@@ -191,6 +193,7 @@ const AdminEditRaceTab = forwardRef<AdminEditRaceTabHandle>(function AdminEditRa
     fileName: '',
     uploadedAt: '',
   })
+  const [startlistsRefreshKey, setStartlistsRefreshKey] = useState(0)
   const [invalidCategoryKeys, setInvalidCategoryKeys] = useState<string[]>([])
   const [categoryRequiredError, setCategoryRequiredError] = useState(false)
   const [editBaseline, setEditBaseline] = useState<string | null>(null)
@@ -372,6 +375,7 @@ const AdminEditRaceTab = forwardRef<AdminEditRaceTabHandle>(function AdminEditRa
           fileName: raceDetail.regulation_file_name ?? '',
           uploadedAt: raceDetail.regulation_uploaded_at ?? '',
         })
+        setStartlistsRefreshKey(k => k + 1)
         setEditBaseline(editStateFingerprint(nextForm, nextCats, nextWaves))
       })
       .catch(() => {
@@ -395,6 +399,7 @@ const AdminEditRaceTab = forwardRef<AdminEditRaceTabHandle>(function AdminEditRa
     setCategories([])
     setStartWaves([])
     setRegulationMeta({ url: '', fileName: '', uploadedAt: '' })
+    setStartlistsRefreshKey(0)
     setInvalidCategoryKeys([])
     setCategoryRequiredError(false)
   }, [])
@@ -574,6 +579,7 @@ const AdminEditRaceTab = forwardRef<AdminEditRaceTabHandle>(function AdminEditRa
       setMessage({ type: 'ok', text: data.message || 'Zapisano zmiany.' })
       scrollRaceFormToTop()
       setEditBaseline(editStateFingerprint(fpForm, fpCats, fpWaves))
+      setStartlistsRefreshKey(k => k + 1)
       setList(prev =>
         prev
           ? prev
@@ -778,6 +784,16 @@ const AdminEditRaceTab = forwardRef<AdminEditRaceTabHandle>(function AdminEditRa
               }
             }}
           />
+          <AdminStartlistsSection
+            raceId={editingId}
+            raceName={form.name}
+            refreshKey={startlistsRefreshKey}
+          />
+          <AdminResultsSection
+            raceId={editingId}
+            raceName={form.name}
+            refreshKey={startlistsRefreshKey}
+          />
           <AdminRaceForm
             form={form}
             setField={setField}
@@ -802,7 +818,6 @@ const AdminEditRaceTab = forwardRef<AdminEditRaceTabHandle>(function AdminEditRa
             submitting={submitting}
             invalidCategoryKeys={invalidCategoryKeys}
             categoryRequiredError={categoryRequiredError}
-            raceId={editingId}
           />
 
           <AdminFeedbackToast message={message} onDismiss={() => setMessage(null)} />

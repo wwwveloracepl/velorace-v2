@@ -531,6 +531,198 @@
   color: var(--red-b);
 }
 
+.regUploadActions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.regUploadActions .btnSecondary,
+.regUploadActions .btnGhost {
+  width: auto;
+  min-width: 0;
+  padding: 7px 14px;
+  font-size: 12px;
+  letter-spacing: 0.6px;
+  box-shadow: none;
+}
+
+.regUploadActions .btnSecondary:hover {
+  box-shadow: none;
+}
+
+.slSection {
+  margin-top: 4px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+}
+
+.slSection + .slSection {
+  margin-top: 8px;
+}
+
+.slSectionToggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
+.slSectionToggle:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.slSectionChevron {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: var(--muted);
+  width: 1em;
+}
+
+.slSectionTitle {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.slSectionBadge {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--stone);
+}
+
+.slSectionBody {
+  padding: 0 10px 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.slCardToggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
+.slCardToggle:hover .regUploadTitle {
+  color: var(--red-b);
+}
+
+.slCardSummary {
+  font-size: 11px;
+  color: var(--stone);
+  margin: 0;
+}
+
+.slRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.slRow:last-child {
+  border-bottom: none;
+}
+
+.slRowInfo {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.slRowLabel {
+  font-size: 13px;
+  color: var(--white);
+}
+
+.slRowMeta {
+  font-size: 11px;
+  color: var(--stone);
+}
+
+.slRowMeta a {
+  color: var(--white);
+  text-decoration: none;
+}
+
+.slRowMeta a:hover {
+  color: var(--red-b);
+}
+
+.slRowActions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 6px;
+  align-items: center;
+}
+
+.slRowActions .btnSecondary,
+.slRowActions .btnGhost {
+  width: auto;
+  min-width: 0;
+  padding: 6px 12px;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  box-shadow: none;
+}
+
+.slGroupForm {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.slCheckList {
+  display: grid;
+  gap: 6px;
+}
+
+.slCheckItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--white);
+  cursor: pointer;
+}
+
+.slCheckItem input {
+  accent-color: var(--red-b);
+}
+
 .formGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1085,9 +1277,27 @@
   gap: 8px;
 }
 
+.raceListActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 @media (max-width: 520px) {
   .tab {
     font-size: 13px;
     padding: 10px 14px;
+  }
+
+  .raceListActions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .raceListActions .btnSecondary {
+    flex: 1 1 auto;
+    text-align: center;
   }
 }

@@ -29,6 +29,8 @@ export interface Race {
   lapsDistanceKm?: number
   entryFeePln?: number
   regulationUrl?: string
+  startlistUrl?: string
+  combinedResultsUrl?: string
 }
 
 // ── Results ────────────────────────────────────────────

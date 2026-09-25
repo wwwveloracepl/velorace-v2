@@ -2,7 +2,7 @@ import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import RaceResultsDownloads from '@/components/results/RaceResultsDownloads'
 import { formatDate } from '@/lib/data'
-import { getRaceByIdFromDatabase } from '@/lib/raceDb'
+import { getRaceByIdFromDatabase, getRaceCategoryDetails } from '@/lib/raceDb'
 import { notFound } from 'next/navigation'
 import styles from './page.module.css'
 
@@ -11,10 +11,14 @@ interface Props {
 }
 
 export default async function RaceResultsOnlyPage({ params }: Props) {
-  const race = await getRaceByIdFromDatabase(params.id)
+  const [race, categoryDetails] = await Promise.all([
+    getRaceByIdFromDatabase(params.id),
+    getRaceCategoryDetails(params.id),
+  ])
   if (!race) notFound()
 
   const { full } = formatDate(race.date)
+  const categories = categoryDetails.map(c => ({ id: c.id, name: c.name }))
 
   return (
     <>
@@ -32,7 +36,11 @@ export default async function RaceResultsOnlyPage({ params }: Props) {
         </header>
 
         <section className={styles.card}>
-          <RaceResultsDownloads raceId={race.id} />
+          <RaceResultsDownloads
+            raceId={race.id}
+            combinedResultsUrl={race.combinedResultsUrl}
+            categories={categories}
+          />
         </section>
       </main>
       <Footer />

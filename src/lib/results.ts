@@ -103,6 +103,69 @@ export function regulationPdfBlobPrefix(slug: string, year?: number): string {
   return `${getResultsBlobRootPrefix(year)}/${seg}/regulamin/`
 }
 
+/** Wyniki zbiorcze PDF: `{root}/{slug}/wyniki-zbiorcze/` */
+export function combinedResultsPdfBlobPrefix(slug: string, year?: number): string {
+  const seg = resultsBlobSlugSegment(slug)
+  return `${getResultsBlobRootPrefix(year)}/${seg}/wyniki-zbiorcze/`
+}
+
+/**
+ * Jeden plik wyników łącznych (wiele dozwolonych):
+ * `{root}/{slug}/wyniki-zbiorcze/{fileId}/`
+ */
+export function combinedResultsFileBlobPrefix(slug: string, fileId: string, year?: number): string {
+  return `${combinedResultsPdfBlobPrefix(slug, year)}${fileId}/`
+}
+
+/**
+ * Elastyczne wyniki per kategoria (UUID):
+ * `{root}/{slug}/kategorie/{categoryId}/`
+ * (osobno od starego `kategoria/{slotIndex}/` używanego w zakładce awaryjnej)
+ */
+export function flexibleResultCategoryBlobPrefix(slug: string, categoryId: string, year?: number): string {
+  const seg = resultsBlobSlugSegment(slug)
+  return `${getResultsBlobRootPrefix(year)}/${seg}/kategorie/${categoryId}/`
+}
+
+/** Prefiks wszystkich wyników per kategoria: `{root}/{slug}/kategorie/` */
+export function flexibleResultsCategoriesForRaceBlobPrefix(slug: string, year?: number): string {
+  const seg = resultsBlobSlugSegment(slug)
+  return `${getResultsBlobRootPrefix(year)}/${seg}/kategorie/`
+}
+
+/**
+ * Elastyczne wyniki per fala (UUID):
+ * `{root}/{slug}/fale/{waveId}/`
+ */
+export function flexibleResultWaveBlobPrefix(slug: string, waveId: string, year?: number): string {
+  const seg = resultsBlobSlugSegment(slug)
+  return `${getResultsBlobRootPrefix(year)}/${seg}/fale/${waveId}/`
+}
+
+/** Prefiks wszystkich wyników per fala: `{root}/{slug}/fale/` */
+export function flexibleResultsWavesForRaceBlobPrefix(slug: string, year?: number): string {
+  const seg = resultsBlobSlugSegment(slug)
+  return `${getResultsBlobRootPrefix(year)}/${seg}/fale/`
+}
+
+/**
+ * Elastyczne wyniki grupy kategorii:
+ * `{root}/{slug}/grupy/{groupId}/`
+ */
+export function flexibleResultGroupBlobPrefix(slug: string, groupId: string, year?: number): string {
+  const seg = resultsBlobSlugSegment(slug)
+  return `${getResultsBlobRootPrefix(year)}/${seg}/grupy/${groupId}/`
+}
+
+export function safeFlexibleResultUploadFileName(fileName: string): string {
+  const base = fileName.replace(/\\/g, '/').split('/').pop() ?? fileName
+  const t = base.replace(/\.\./g, '').replace(/[\x00-\x1f<>:"|?*]/g, '_').trim()
+  if (!t) return 'wyniki.pdf'
+  if (/\.pdf$/i.test(t)) return t.length > 200 ? t.slice(0, 200) : t
+  const withExt = `${t.replace(/\.pdf$/i, '')}.pdf`
+  return withExt.length > 200 ? withExt.slice(0, 200) : withExt
+}
+
 export type ParsedResultBlob =
   | { kind: 'legacy'; raceId: string; position: number; fileName: string }
   | { kind: 'slug'; slug: string; mode: ResultsPdfSlotMode; slotIndex: number; fileName: string }

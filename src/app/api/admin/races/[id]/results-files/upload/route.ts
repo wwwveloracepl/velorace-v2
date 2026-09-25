@@ -4,10 +4,11 @@ import { getAuthUserFromRequest } from '@/lib/serverAuth'
 import { getDb } from '@/lib/db'
 import { getRaceResultsPdfContext, isAllowedResultsRaceId } from '@/lib/raceDb'
 import {
-  safeStartlistUploadFileName,
-  startlistBlobPrefix,
-  startlistWaveBlobPrefix,
-} from '@/lib/startlists'
+  flexibleResultCategoryBlobPrefix,
+  flexibleResultWaveBlobPrefix,
+  isPdfUpload,
+  safeFlexibleResultUploadFileName,
+} from '@/lib/results'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -66,7 +67,7 @@ async function resolveTarget(
     }
     return {
       ok: true,
-      folderPrefix: startlistBlobPrefix(raceCtx.slug, raceCtx.raceYear, categoryId),
+      folderPrefix: flexibleResultCategoryBlobPrefix(raceCtx.slug, categoryId, raceCtx.raceYear),
     }
   }
 
@@ -83,7 +84,7 @@ async function resolveTarget(
   }
   return {
     ok: true,
-    folderPrefix: startlistWaveBlobPrefix(raceCtx.slug, raceCtx.raceYear, waveId),
+    folderPrefix: flexibleResultWaveBlobPrefix(raceCtx.slug, waveId, raceCtx.raceYear),
   }
 }
 
@@ -126,8 +127,12 @@ export async function POST(req: NextRequest, ctx: { params: { id: string } | Pro
   const nameCandidate =
     typeof (file as unknown as { name?: unknown }).name === 'string'
       ? (file as unknown as { name: string }).name
-      : 'startlist.pdf'
-  const safeName = safeStartlistUploadFileName(nameCandidate)
+      : 'wyniki.pdf'
+  const safeName = safeFlexibleResultUploadFileName(nameCandidate)
+
+  if (!isPdfUpload(file, safeName)) {
+    return NextResponse.json({ ok: false, message: 'Dozwolone są tylko pliki PDF.' }, { status: 400 })
+  }
 
   if (file.size > MAX_BYTES) {
     return NextResponse.json({ ok: false, message: 'Plik za duży (max 25 MB).' }, { status: 400 })
@@ -150,8 +155,8 @@ export async function POST(req: NextRequest, ctx: { params: { id: string } | Pro
       pathname: blob.pathname,
     })
   } catch (e) {
-    console.error('[startlists/upload]', e)
-    return NextResponse.json({ ok: false, message: 'Nie udało się wgrać listy startowej.' }, { status: 500 })
+    console.error('[results-files/upload]', e)
+    return NextResponse.json({ ok: false, message: 'Nie udało się wgrać wyników.' }, { status: 500 })
   }
 }
 
@@ -185,7 +190,7 @@ export async function DELETE(req: NextRequest, ctx: { params: { id: string } | P
     await deleteObjectsByPath(existing.map(b => b.pathname))
     return NextResponse.json({ ok: true, deleted: existing.length })
   } catch (e) {
-    console.error('[startlists/upload DELETE]', e)
-    return NextResponse.json({ ok: false, message: 'Nie udało się usunąć listy startowej.' }, { status: 500 })
+    console.error('[results-files/upload DELETE]', e)
+    return NextResponse.json({ ok: false, message: 'Nie udało się usunąć wyników.' }, { status: 500 })
   }
 }

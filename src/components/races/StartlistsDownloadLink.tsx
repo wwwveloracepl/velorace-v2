@@ -6,13 +6,16 @@ export default function StartlistsDownloadLink({
   raceId,
   className,
   label = 'Listy startowe',
+  startlistUrl,
 }: {
   raceId: string
   className: string
   label?: string
+  /** Bezpośredni URL listy łącznej (jeśli już znany z danych wyścigu). */
+  startlistUrl?: string
 }) {
-  const [hasStartlists, setHasStartlists] = useState(false)
-  const [loading, setLoading] = useState(true)
+  const [hasStartlists, setHasStartlists] = useState(Boolean(startlistUrl))
+  const [loading, setLoading] = useState(!startlistUrl)
 
   useEffect(() => {
     let cancelled = false
@@ -21,15 +24,26 @@ export default function StartlistsDownloadLink({
     const q = new URLSearchParams({ raceId })
     fetch(`/api/startlists?${q.toString()}`, { cache: 'no-store' })
       .then(r => r.json().catch(() => ({})))
-      .then((d: { ok?: boolean; urls?: Record<string, string | null> }) => {
-        if (cancelled) return
-        const urls = d?.urls ?? {}
-        const any = Object.values(urls).some(Boolean)
-        setHasStartlists(any)
-      })
+      .then(
+        (d: {
+          ok?: boolean
+          urls?: Record<string, string | null>
+          combined?: { url: string } | null
+          waves?: { url: string }[]
+          groups?: { url: string }[]
+        }) => {
+          if (cancelled) return
+          const urls = d?.urls ?? {}
+          const anyCategory = Object.values(urls).some(Boolean)
+          const anyWave = (d.waves ?? []).some(w => Boolean(w.url))
+          const anyGroup = (d.groups ?? []).some(g => Boolean(g.url))
+          const anyCombined = Boolean(d.combined?.url || startlistUrl)
+          setHasStartlists(anyCategory || anyWave || anyGroup || anyCombined)
+        },
+      )
       .catch(() => {
         if (cancelled) return
-        setHasStartlists(false)
+        setHasStartlists(Boolean(startlistUrl))
       })
       .finally(() => {
         if (cancelled) return
@@ -39,7 +53,7 @@ export default function StartlistsDownloadLink({
     return () => {
       cancelled = true
     }
-  }, [raceId])
+  }, [raceId, startlistUrl])
 
   if (loading || !hasStartlists) return null
 

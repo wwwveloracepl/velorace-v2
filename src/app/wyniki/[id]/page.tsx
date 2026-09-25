@@ -54,11 +54,18 @@ export default async function RaceResultsPage({ params }: Props) {
           <p className={styles.subtitle}>
             {full} · {race.city} · {getRaceTypeLabel(race.type || race.category)}
           </p>
-          {race.regulationUrl ? (
+          {(race.regulationUrl || race.startlistUrl) ? (
             <div className={styles.headerActions}>
-              <a href={race.regulationUrl} className={styles.regulationLink} target="_blank" rel="noreferrer">
-                Pobierz regulamin
-              </a>
+              {race.regulationUrl ? (
+                <a href={race.regulationUrl} className={styles.regulationLink} target="_blank" rel="noreferrer">
+                  Pobierz regulamin
+                </a>
+              ) : null}
+              {race.startlistUrl ? (
+                <a href={race.startlistUrl} className={styles.regulationLink} target="_blank" rel="noreferrer">
+                  Pobierz listę startową
+                </a>
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -132,9 +139,17 @@ export default async function RaceResultsPage({ params }: Props) {
           <aside className={`${styles.card} ${styles.sideCard}`}>
             <h2 className={styles.cardTitle}>Pobierz wyniki</h2>
             <div className={styles.downloadsBody}>
-              <RaceResultsDownloads raceId={race.id} />
+              <RaceResultsDownloads
+                raceId={race.id}
+                combinedResultsUrl={race.combinedResultsUrl}
+                categories={categoriesForStartlists}
+              />
             </div>
-            <RaceStartlistsSection raceId={race.id} categories={categoriesForStartlists} />
+            <RaceStartlistsSection
+              raceId={race.id}
+              categories={categoriesForStartlists}
+              combinedStartlistUrl={race.startlistUrl}
+            />
           </aside>
         </div>
       </main>
