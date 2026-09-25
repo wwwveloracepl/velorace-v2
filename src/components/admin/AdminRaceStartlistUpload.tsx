@@ -180,7 +180,7 @@ export default function AdminRaceStartlistUpload({
         ) : (
           <button
             type="button"
-            className={styles.btnGhost}
+            className={styles.btnFileDelete}
             disabled={!raceId || status !== 'idle'}
             onClick={handleDelete}
           >

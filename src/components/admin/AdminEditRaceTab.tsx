@@ -200,6 +200,8 @@ const AdminEditRaceTab = forwardRef<AdminEditRaceTabHandle>(function AdminEditRa
   const [unsavedPrompt, setUnsavedPrompt] = useState<{
     resolve: (choice: 'save' | 'discard' | 'cancel') => void
   } | null>(null)
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
+  const [deletingRace, setDeletingRace] = useState(false)
 
   const isDirty = useMemo(() => {
     if (!editingId || loadingDetail || loadErr || editBaseline === null || !detailSnap.current) return false
@@ -395,6 +397,8 @@ const AdminEditRaceTab = forwardRef<AdminEditRaceTabHandle>(function AdminEditRa
     setLoadErr(null)
     setMessage(null)
     setEditBaseline(null)
+    setConfirmDeleteOpen(false)
+    setDeletingRace(false)
     setForm(initialRaceForm())
     setCategories([])
     setStartWaves([])
@@ -614,6 +618,44 @@ const AdminEditRaceTab = forwardRef<AdminEditRaceTabHandle>(function AdminEditRa
     await performSave()
   }
 
+  async function handleDeleteRaceConfirmed() {
+    if (!editingId || deletingRace) return
+    setDeletingRace(true)
+    setMessage(null)
+    try {
+      const res = await fetch(`/api/admin/races/${encodeURIComponent(editingId)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+      const d = (await res.json().catch(() => ({}))) as {
+        ok?: boolean
+        message?: string
+        deletedFiles?: number
+      }
+      if (!res.ok || !d?.ok) {
+        setMessage({ type: 'err', text: d?.message || 'Nie udało się usunąć wyścigu.' })
+        setConfirmDeleteOpen(false)
+        return
+      }
+      const deletedId = editingId
+      const filesNote =
+        typeof d.deletedFiles === 'number' && d.deletedFiles > 0
+          ? ` Usunięto też ${d.deletedFiles} plik(ów) z magazynu.`
+          : ''
+      setList(prev => (prev ? prev.filter(r => r.id !== deletedId) : prev))
+      closeEditor()
+      setMessage({
+        type: 'ok',
+        text: (d.message || 'Usunięto wyścig.') + filesNote,
+      })
+    } catch {
+      setMessage({ type: 'err', text: 'Brak połączenia z serwerem.' })
+      setConfirmDeleteOpen(false)
+    } finally {
+      setDeletingRace(false)
+    }
+  }
+
   const tryBackToList = useCallback(async () => {
     if (!editingId) return
     if (!isDirty) {
@@ -820,11 +862,53 @@ const AdminEditRaceTab = forwardRef<AdminEditRaceTabHandle>(function AdminEditRa
             categoryRequiredError={categoryRequiredError}
           />
 
-          <AdminFeedbackToast message={message} onDismiss={() => setMessage(null)} />
+          <div className={styles.raceDeleteZone}>
+            <p className={styles.raceDeleteZoneTitle}>Usuń wyścig</p>
+            <p className={styles.raceDeleteZoneHint}>
+              Trwale usuwa wyścig z bazy oraz wszystkie powiązane pliki (regulamin, listy startowe, wyniki).
+            </p>
+            <div className={styles.resultsDangerZone}>
+              <button
+                type="button"
+                className={`${styles.btnSecondary} ${styles.btnDanger}`}
+                onClick={() => setConfirmDeleteOpen(true)}
+                disabled={deletingRace || submitting}
+              >
+                {deletingRace ? 'Usuwanie…' : 'Usuń wyścig'}
+              </button>
+              {confirmDeleteOpen ? (
+                <div className={styles.resultsDangerConfirmBox}>
+                  <p className={styles.resultsDangerConfirmText}>
+                    Na pewno usunąć „{form.name.trim() || 'ten wyścig'}”? Tej operacji nie można cofnąć.
+                  </p>
+                  <div className={styles.resultsDangerConfirmActions}>
+                    <button
+                      type="button"
+                      className={`${styles.btnSecondary} ${styles.resultsDangerCancel}`}
+                      onClick={() => setConfirmDeleteOpen(false)}
+                      disabled={deletingRace}
+                    >
+                      Anuluj
+                    </button>
+                    <button
+                      type="button"
+                      className={`${styles.btnSecondary} ${styles.btnDanger}`}
+                      onClick={() => void handleDeleteRaceConfirmed()}
+                      disabled={deletingRace}
+                    >
+                      {deletingRace ? 'Usuwanie…' : 'Usuń trwale'}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </div>
         </>
       )}
     </div>
       )}
+
+      <AdminFeedbackToast message={message} onDismiss={() => setMessage(null)} />
 
       {unsavedPrompt && (
         <div

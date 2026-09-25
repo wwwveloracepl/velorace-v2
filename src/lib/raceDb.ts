@@ -1221,6 +1221,44 @@ export async function getAdminRaceForEdit(raceId: string): Promise<AdminRaceEdit
   }
 }
 
+/**
+ * Usuwa wyścig z bazy (powiązane wiersze przez ON DELETE CASCADE).
+ * Zwraca slug i rok do skasowania obiektów w R2 po stronie API.
+ */
+export async function deleteAdminRace(
+  raceId: string,
+): Promise<{ id: string; slug: string; raceYear: number; name: string }> {
+  const sql = getDb()
+  if (!sql) {
+    throw new Error('Brak DATABASE_URL — skonfiguruj Neon i zmienne środowiskowe.')
+  }
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(raceId)) {
+    throw new Error('Nieprawidłowy identyfikator wyścigu.')
+  }
+
+  const rows = await sql`
+    SELECT id::text AS id, slug, name, race_date::text AS race_date
+    FROM races
+    WHERE id = ${raceId}::uuid
+    LIMIT 1
+  `
+  if (!rows.length) {
+    throw new Error('Wyścig nie istnieje.')
+  }
+
+  const row = rows[0] as { id: string; slug: string; name: string; race_date: string }
+  const raceDate = String(row.race_date ?? '')
+  const raceYearRaw = Number.parseInt(raceDate.slice(0, 4), 10)
+  const raceYear = Number.isInteger(raceYearRaw) && raceYearRaw >= 2000 ? raceYearRaw : new Date().getFullYear()
+  const slug = String(row.slug)
+  const name = String(row.name ?? '')
+
+  await sql`DELETE FROM races WHERE id = ${raceId}::uuid`
+  invalidateRacesMergeCache()
+
+  return { id: raceId, slug, raceYear, name }
+}
+
 export async function updateAdminRace(
   raceId: string,
   payload: AdminRaceInsertPayload,

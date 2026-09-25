@@ -2,9 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthUserFromRequest } from '@/lib/serverAuth'
 import { parseCategories, parseStartWaves } from '@/lib/adminRaceRequest'
 import { jsonSafeClone } from '@/lib/jsonSafe'
+import { deleteObjectsByPrefixes, hasObjectStoreConfig } from '@/lib/objectStore'
+import { resultsRaceRootBlobPrefixCandidates } from '@/lib/results'
+import { startlistsRaceRootBlobPrefix } from '@/lib/startlists'
 import {
   DB_RACE_STATUSES,
   DB_RACE_TYPES,
+  deleteAdminRace,
   getAdminRaceForEdit,
   updateAdminRace,
   type AdminRaceInsertPayload,
@@ -174,6 +178,58 @@ export async function PATCH(req: NextRequest, ctx: { params: { id: string } | Pr
     const msg = e instanceof Error ? e.message : 'Błąd zapisu.'
     console.error('[admin/races/[id] PATCH]', e)
     const status = msg.includes('DATABASE_URL') || msg.includes('organizatora') ? 503 : 400
+    return NextResponse.json({ ok: false, message: msg }, { status })
+  }
+}
+
+export async function DELETE(req: NextRequest, ctx: { params: { id: string } | Promise<{ id: string }> }) {
+  const user = getAuthUserFromRequest(req)
+  if (!user || user.role !== 'admin') {
+    return NextResponse.json({ ok: false, message: 'Brak dostępu.' }, { status: 403 })
+  }
+
+  const resolved = ctx.params instanceof Promise ? await ctx.params : ctx.params
+  const id = typeof resolved?.id === 'string' ? resolved.id.trim() : ''
+  if (!id) {
+    return NextResponse.json({ ok: false, message: 'Brak identyfikatora wyścigu.' }, { status: 400 })
+  }
+
+  try {
+    const preview = await getAdminRaceForEdit(id)
+    if (!preview) {
+      return NextResponse.json({ ok: false, message: 'Nie znaleziono wyścigu.' }, { status: 404 })
+    }
+
+    const raceYearRaw = Number.parseInt(preview.race_date.slice(0, 4), 10)
+    const raceYear =
+      Number.isInteger(raceYearRaw) && raceYearRaw >= 2000 ? raceYearRaw : new Date().getFullYear()
+
+    let deletedFiles = 0
+    if (hasObjectStoreConfig()) {
+      const prefixes = [
+        ...resultsRaceRootBlobPrefixCandidates(preview.slug, id, raceYear),
+        startlistsRaceRootBlobPrefix(preview.slug, raceYear),
+      ]
+      deletedFiles = await deleteObjectsByPrefixes(prefixes)
+    }
+
+    const deleted = await deleteAdminRace(id)
+    return NextResponse.json({
+      ok: true,
+      id: deleted.id,
+      slug: deleted.slug,
+      deletedFiles,
+      message: 'Usunięto wyścig oraz powiązane pliki.',
+    })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Błąd usuwania.'
+    console.error('[admin/races/[id] DELETE]', e)
+    const status =
+      msg.includes('DATABASE_URL') || msg.includes('organizatora')
+        ? 503
+        : msg.includes('nie istnieje') || msg.includes('Nieprawidłowy')
+          ? 404
+          : 500
     return NextResponse.json({ ok: false, message: msg }, { status })
   }
 }

@@ -1,15 +1,15 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useResultBlobUrls } from '@/components/results/ResultsCategoriesBody'
-import styles from './RaceResultsDownloads.module.css'
+import styles from './RaceStartlistDownloads.module.css'
 
 type CategoryLike = { id: string; name: string }
 
 type CombinedItem = { id: string; label: string; url: string; fileName: string }
 
-type FlexibleResultsResponse = {
+type StartlistsResponse = {
   ok?: boolean
+  message?: string
   urls?: Record<string, string | null>
   combined?: CombinedItem[] | { url: string; fileName: string } | null
   waves?: { id: string; label: string; url: string; fileName: string }[]
@@ -18,7 +18,7 @@ type FlexibleResultsResponse = {
 }
 
 function normalizeCombined(
-  raw: FlexibleResultsResponse['combined'],
+  raw: StartlistsResponse['combined'],
   fallbackUrl?: string,
 ): CombinedItem[] {
   if (Array.isArray(raw)) {
@@ -38,141 +38,119 @@ function normalizeCombined(
   return []
 }
 
-export default function RaceResultsDownloads({
+/** Lista plików list startowych do pobrania (używana też w modalu na stronie głównej). */
+export default function RaceStartlistsDownloads({
   raceId,
-  combinedResultsUrl,
+  combinedStartlistUrl,
   categories = [],
 }: {
   raceId: string
-  combinedResultsUrl?: string
+  combinedStartlistUrl?: string
   categories?: CategoryLike[]
 }) {
-  const {
-    downloadHrefs,
-    labels,
-    slotCount,
-    blobsLoading: legacyLoading,
-    listError: legacyError,
-  } = useResultBlobUrls(raceId)
-
-  const [flexLoading, setFlexLoading] = useState(true)
-  const [categoryUrls, setCategoryUrls] = useState<Record<string, string | null>>({})
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [urls, setUrls] = useState<Record<string, string | null>>({})
   const [apiCategories, setApiCategories] = useState<CategoryLike[]>([])
   const [combined, setCombined] = useState<CombinedItem[]>(
-    combinedResultsUrl ? [{ id: 'legacy', label: '', url: combinedResultsUrl, fileName: '' }] : [],
+    combinedStartlistUrl ? [{ id: 'legacy', label: '', url: combinedStartlistUrl, fileName: '' }] : [],
   )
   const [waves, setWaves] = useState<{ id: string; label: string; url: string }[]>([])
   const [groups, setGroups] = useState<{ id: string; label: string; url: string }[]>([])
 
   useEffect(() => {
     let cancelled = false
-    setFlexLoading(true)
+    setLoading(true)
+    setError(null)
 
     const q = new URLSearchParams({ raceId })
-    fetch(`/api/results-files?${q}`, { cache: 'no-store' })
+    fetch(`/api/startlists?${q}`, { cache: 'no-store' })
       .then(r => r.json().catch(() => ({})))
-      .then((d: FlexibleResultsResponse) => {
+      .then((d: StartlistsResponse) => {
         if (cancelled) return
         if (!d?.ok) {
-          setCategoryUrls({})
+          setError(typeof d?.message === 'string' ? d.message : 'Nie udało się pobrać list startowych.')
+          setUrls({})
           setApiCategories([])
           setWaves([])
           setGroups([])
-          setCombined(normalizeCombined(null, combinedResultsUrl))
+          setCombined(normalizeCombined(null, combinedStartlistUrl))
           return
         }
-        setCategoryUrls(d.urls ?? {})
+        setUrls(d.urls ?? {})
         setApiCategories(Array.isArray(d.categories) ? d.categories : [])
-        setCombined(normalizeCombined(d.combined, combinedResultsUrl))
+        setCombined(normalizeCombined(d.combined, combinedStartlistUrl))
         setWaves((d.waves ?? []).map(w => ({ id: w.id, label: w.label, url: w.url })))
         setGroups((d.groups ?? []).map(g => ({ id: g.id, label: g.label, url: g.url })))
       })
       .catch(() => {
         if (cancelled) return
-        setCategoryUrls({})
+        setError('Błąd połączenia.')
+        setUrls({})
         setApiCategories([])
         setWaves([])
         setGroups([])
-        setCombined(normalizeCombined(null, combinedResultsUrl))
+        setCombined(normalizeCombined(null, combinedStartlistUrl))
       })
       .finally(() => {
-        if (!cancelled) setFlexLoading(false)
+        if (cancelled) return
+        setLoading(false)
       })
 
     return () => {
       cancelled = true
     }
-  }, [raceId, combinedResultsUrl])
+  }, [raceId, combinedStartlistUrl])
 
   const resolvedCategories = categories.length > 0 ? categories : apiCategories
 
   const publishedCategories = useMemo(() => {
     return resolvedCategories
-      .map(c => ({ cat: c, href: categoryUrls[c.id] ?? null }))
+      .map(c => ({ cat: c, href: urls[c.id] ?? null }))
       .filter(x => x.href)
-  }, [resolvedCategories, categoryUrls])
+  }, [resolvedCategories, urls])
 
-  const legacyRows = useMemo(
-    () =>
-      Array.from({ length: slotCount }, (_, i) => i + 1)
-        .map(slot => ({
-          slot,
-          label: labels[slot] ?? `Wyniki ${slot}`,
-          href: downloadHrefs[slot] ?? null,
-        }))
-        .filter(row => row.href),
-    [downloadHrefs, labels, slotCount],
-  )
-
-  const hasFlexible =
+  const hasAny =
     combined.length > 0 || publishedCategories.length > 0 || waves.length > 0 || groups.length > 0
-  const hasLegacy = legacyRows.length > 0
-  const loading = (flexLoading || legacyLoading) && !combinedResultsUrl
 
-  if (loading) {
-    return <p className={styles.message}>Ładowanie listy wyników…</p>
+  if (loading && !combinedStartlistUrl) {
+    return <p className={styles.message}>Ładowanie list startowych…</p>
   }
 
-  if (!hasFlexible && !hasLegacy) {
-    if (legacyError && !combinedResultsUrl) {
-      return <p className={styles.message}>{legacyError}</p>
-    }
-    return <p className={styles.message}>Wyniki nie zostały jeszcze opublikowane.</p>
+  if (error && !hasAny) {
+    return <p className={styles.message}>{error}</p>
+  }
+
+  if (!hasAny) {
+    return <p className={styles.message}>Listy startowe nie zostały jeszcze opublikowane.</p>
   }
 
   return (
     <div className={styles.list}>
       {combined.map((f, i) => (
         <a key={f.id} href={f.url} target="_blank" rel="noreferrer" className={styles.item}>
-          <span>
-            {f.label?.trim() ||
-              (combined.length > 1 ? `Wyniki łączne ${i + 1}` : 'Wyniki łączne')}
+          <span className={styles.label}>
+            {f.label?.trim() || (combined.length > 1 ? `Lista startowa ${i + 1}` : 'Lista startowa')}
           </span>
-          <span className={styles.itemAction}>Pobierz</span>
+          <span className={styles.action}>Pobierz</span>
         </a>
       ))}
       {groups.map(g => (
         <a key={g.id} href={g.url} target="_blank" rel="noreferrer" className={styles.item}>
-          <span>{g.label}</span>
-          <span className={styles.itemAction}>Pobierz</span>
+          <span className={styles.label}>{g.label}</span>
+          <span className={styles.action}>Pobierz</span>
         </a>
       ))}
       {waves.map(w => (
         <a key={w.id} href={w.url} target="_blank" rel="noreferrer" className={styles.item}>
-          <span>{w.label}</span>
-          <span className={styles.itemAction}>Pobierz</span>
+          <span className={styles.label}>{w.label}</span>
+          <span className={styles.action}>Pobierz</span>
         </a>
       ))}
       {publishedCategories.map(x => (
         <a key={x.cat.id} href={x.href ?? '#'} target="_blank" rel="noreferrer" className={styles.item}>
-          <span>{x.cat.name}</span>
-          <span className={styles.itemAction}>Pobierz</span>
-        </a>
-      ))}
-      {legacyRows.map(row => (
-        <a key={`legacy-${row.slot}`} href={row.href ?? '#'} target="_blank" rel="noreferrer" className={styles.item}>
-          <span>{row.label}</span>
-          <span className={styles.itemAction}>Pobierz</span>
+          <span className={styles.label}>{x.cat.name}</span>
+          <span className={styles.action}>Pobierz</span>
         </a>
       ))}
     </div>

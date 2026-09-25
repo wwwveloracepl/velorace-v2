@@ -160,6 +160,30 @@
   gap: 10px;
 }
 
+.raceDeleteZone {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.raceDeleteZoneTitle {
+  margin: 0 0 6px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.raceDeleteZoneHint {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted);
+  max-width: 520px;
+}
+
 .btnSecondary.btnDanger {
   border-color: var(--red, #c41e3a);
   background: var(--red, #c41e3a);
@@ -170,6 +194,34 @@
   border-color: var(--red-b, #e04a5f);
   background: var(--red-b, #e04a5f);
   color: var(--white, #fff);
+}
+
+/* Usuwanie wgranego pliku — większy, wyraźnie czerwony */
+.btnFileDelete {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 12px 22px;
+  border-radius: 4px;
+  border: none;
+  background: var(--red, #c41e3a);
+  color: var(--white, #fff);
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(196, 30, 58, 0.35);
+  transition: background 0.15s, opacity 0.15s;
+  width: auto;
+  min-width: 0;
+}
+
+.btnFileDelete:hover:not(:disabled) {
+  background: var(--red-b, #e04a5f);
+}
+
+.btnFileDelete:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .resultsDangerConfirmBox {
@@ -549,6 +601,13 @@
   box-shadow: none;
 }
 
+.regUploadActions .btnFileDelete {
+  padding: 12px 22px;
+  font-size: 14px;
+  letter-spacing: 1px;
+  box-shadow: 0 4px 12px rgba(196, 30, 58, 0.35);
+}
+
 .regUploadActions .btnSecondary:hover {
   box-shadow: none;
 }
@@ -693,6 +752,13 @@
   font-size: 11px;
   letter-spacing: 0.5px;
   box-shadow: none;
+}
+
+.slRowActions .btnFileDelete {
+  padding: 10px 18px;
+  font-size: 13px;
+  letter-spacing: 0.8px;
+  box-shadow: 0 4px 12px rgba(196, 30, 58, 0.35);
 }
 
 .slGroupForm {

@@ -1,14 +1,18 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import RaceDownloadsModal from '@/components/races/RaceDownloadsModal'
+import RaceResultsDownloads from '@/components/results/RaceResultsDownloads'
 
 export default function ResultsDownloadLink({
   raceId,
+  raceName,
   className,
   label = 'Pobierz wyniki',
   combinedResultsUrl,
 }: {
   raceId: string
+  raceName?: string
   className: string
   /** Unused when results are missing — link is hidden entirely. */
   disabledClassName?: string
@@ -18,6 +22,9 @@ export default function ResultsDownloadLink({
 }) {
   const [hasResults, setHasResults] = useState(Boolean(combinedResultsUrl))
   const [loading, setLoading] = useState(!combinedResultsUrl)
+  const [open, setOpen] = useState(false)
+
+  const close = useCallback(() => setOpen(false), [])
 
   useEffect(() => {
     if (combinedResultsUrl) {
@@ -30,14 +37,33 @@ export default function ResultsDownloadLink({
     setLoading(true)
 
     const q = new URLSearchParams({ raceId })
-    fetch(`/api/results?${q.toString()}`, { cache: 'no-store' })
-      .then(r => r.json().catch(() => ({})))
-      .then((d: { ok?: boolean; urls?: Record<string, string | null> }) => {
-        if (cancelled) return
-        const urls = d?.urls ?? {}
-        const any = Object.values(urls).some(Boolean)
-        setHasResults(any)
-      })
+    Promise.all([
+      fetch(`/api/results-files?${q}`, { cache: 'no-store' }).then(r => r.json().catch(() => ({}))),
+      fetch(`/api/results?${q}`, { cache: 'no-store' }).then(r => r.json().catch(() => ({}))),
+    ])
+      .then(
+        ([flex, legacy]: [
+          {
+            ok?: boolean
+            urls?: Record<string, string | null>
+            combined?: unknown[] | { url?: string } | null
+            waves?: { url: string }[]
+            groups?: { url: string }[]
+          },
+          { urls?: Record<string, string | null> },
+        ]) => {
+          if (cancelled) return
+          const flexUrls = flex?.urls ?? {}
+          const anyCategory = Object.values(flexUrls).some(Boolean)
+          const anyWave = (flex.waves ?? []).some(w => Boolean(w.url))
+          const anyGroup = (flex.groups ?? []).some(g => Boolean(g.url))
+          const anyCombined = Array.isArray(flex.combined)
+            ? flex.combined.some(c => Boolean(c && typeof c === 'object' && 'url' in c && c.url))
+            : Boolean(flex.combined && typeof flex.combined === 'object' && flex.combined.url)
+          const anyLegacy = Object.values(legacy?.urls ?? {}).some(Boolean)
+          setHasResults(anyCategory || anyWave || anyGroup || anyCombined || anyLegacy)
+        },
+      )
       .catch(() => {
         if (cancelled) return
         setHasResults(false)
@@ -54,17 +80,16 @@ export default function ResultsDownloadLink({
 
   if (loading || !hasResults) return null
 
-  if (combinedResultsUrl) {
-    return (
-      <a href={combinedResultsUrl} className={className} target="_blank" rel="noreferrer">
-        {label}
-      </a>
-    )
-  }
-
   return (
-    <a href={`/wyniki/${raceId}/pobierz`} className={className}>
-      {label}
-    </a>
+    <>
+      <button type="button" className={className} onClick={() => setOpen(true)}>
+        {label}
+      </button>
+      {open ? (
+        <RaceDownloadsModal title="Wyniki" subtitle={raceName} onClose={close}>
+          <RaceResultsDownloads raceId={raceId} combinedResultsUrl={combinedResultsUrl} />
+        </RaceDownloadsModal>
+      ) : null}
+    </>
   )
 }

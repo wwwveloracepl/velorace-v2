@@ -108,12 +108,14 @@ export default async function UpcomingRaces({
                 </div>
                 <ResultsDownloadLink
                   raceId={race.id}
+                  raceName={race.name}
                   className={styles.regulationLink}
                   label="Wyniki"
                   combinedResultsUrl={race.combinedResultsUrl}
                 />
                 <StartlistsDownloadLink
                   raceId={race.id}
+                  raceName={race.name}
                   className={styles.regulationLink}
                   label="Listy startowe"
                   startlistUrl={race.startlistUrl}
@@ -170,12 +172,14 @@ export default async function UpcomingRaces({
                 </div>
                 <ResultsDownloadLink
                   raceId={race.id}
+                  raceName={race.name}
                   className={styles.regulationLink}
                   label="Wyniki"
                   combinedResultsUrl={race.combinedResultsUrl}
                 />
                 <StartlistsDownloadLink
                   raceId={race.id}
+                  raceName={race.name}
                   className={styles.regulationLink}
                   label="Listy startowe"
                   startlistUrl={race.startlistUrl}

@@ -97,6 +97,23 @@ export function resultPdfBlobPrefixCandidates(
   return Array.from(new Set(out))
 }
 
+/** Prefiks całego drzewa plików wyścigu w wynikach/regulaminach: `{root}/{slug}/` */
+export function resultsRaceRootBlobPrefix(slug: string, year?: number): string {
+  const seg = resultsBlobSlugSegment(slug)
+  return `${getResultsBlobRootPrefix(year)}/${seg}/`
+}
+
+/** Wszystkie możliwe korzenie (aktualny + legacy) dla danego wyścigu. */
+export function resultsRaceRootBlobPrefixCandidates(slug: string, raceId: string, year?: number): string[] {
+  const seg = resultsBlobSlugSegment(slug)
+  const out: string[] = []
+  for (const root of getResultsBlobPrefixCandidates(year)) {
+    out.push(`${root}/${seg}/`)
+    out.push(`${root}/${raceId}/`)
+  }
+  return Array.from(new Set(out))
+}
+
 /** Regulamin PDF: `{root}/{slug}/regulamin/` */
 export function regulationPdfBlobPrefix(slug: string, year?: number): string {
   const seg = resultsBlobSlugSegment(slug)

@@ -128,3 +128,25 @@ export async function deleteObjectsByPath(pathnames: string[]): Promise<void> {
   }
 }
 
+/** Usuwa wszystkie obiekty pod danymi prefiksami (paginacja ListObjects). Zwraca liczbę usuniętych kluczy. */
+export async function deleteObjectsByPrefixes(prefixes: string[]): Promise<number> {
+  const uniquePrefixes = Array.from(new Set(prefixes.map(p => p.trim()).filter(Boolean)))
+  if (uniquePrefixes.length === 0) return 0
+
+  const pathnames: string[] = []
+  for (const prefix of uniquePrefixes) {
+    let cursor: string | undefined
+    for (;;) {
+      const batch = await listObjects({ prefix, cursor })
+      for (const blob of batch.blobs) {
+        if (blob.pathname) pathnames.push(blob.pathname)
+      }
+      if (!batch.hasMore || !batch.cursor) break
+      cursor = batch.cursor
+    }
+  }
+
+  await deleteObjectsByPath(pathnames)
+  return Array.from(new Set(pathnames)).length
+}
+

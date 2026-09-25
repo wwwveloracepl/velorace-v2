@@ -213,6 +213,20 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    let categories: { id: string; name: string }[] = []
+    if (sql) {
+      const catRows = await sql`
+        SELECT id::text AS id, name
+        FROM race_categories
+        WHERE race_id = ${raceId}::uuid
+        ORDER BY display_order NULLS LAST, name NULLS LAST
+      `
+      categories = (catRows as { id: string; name: string }[]).map(r => ({
+        id: String(r.id),
+        name: String(r.name ?? ''),
+      }))
+    }
+
     return NextResponse.json({
       ok: true,
       raceId,
@@ -221,6 +235,7 @@ export async function GET(req: NextRequest) {
       combined,
       waves,
       groups,
+      categories,
     })
   } catch (e) {
     console.error('[api/results-files]', e)

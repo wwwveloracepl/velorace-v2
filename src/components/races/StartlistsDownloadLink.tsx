@@ -1,14 +1,18 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import RaceDownloadsModal from '@/components/races/RaceDownloadsModal'
+import RaceStartlistsDownloads from '@/components/results/RaceStartlistsDownloads'
 
 export default function StartlistsDownloadLink({
   raceId,
+  raceName,
   className,
   label = 'Listy startowe',
   startlistUrl,
 }: {
   raceId: string
+  raceName?: string
   className: string
   label?: string
   /** Bezpośredni URL listy łącznej (jeśli już znany z danych wyścigu). */
@@ -16,6 +20,9 @@ export default function StartlistsDownloadLink({
 }) {
   const [hasStartlists, setHasStartlists] = useState(Boolean(startlistUrl))
   const [loading, setLoading] = useState(!startlistUrl)
+  const [open, setOpen] = useState(false)
+
+  const close = useCallback(() => setOpen(false), [])
 
   useEffect(() => {
     let cancelled = false
@@ -28,7 +35,7 @@ export default function StartlistsDownloadLink({
         (d: {
           ok?: boolean
           urls?: Record<string, string | null>
-          combined?: { url: string } | null
+          combined?: unknown[] | { url?: string } | null
           waves?: { url: string }[]
           groups?: { url: string }[]
         }) => {
@@ -37,7 +44,12 @@ export default function StartlistsDownloadLink({
           const anyCategory = Object.values(urls).some(Boolean)
           const anyWave = (d.waves ?? []).some(w => Boolean(w.url))
           const anyGroup = (d.groups ?? []).some(g => Boolean(g.url))
-          const anyCombined = Boolean(d.combined?.url || startlistUrl)
+          const anyCombined = Array.isArray(d.combined)
+            ? d.combined.some(c => Boolean(c && typeof c === 'object' && 'url' in c && c.url)) ||
+              Boolean(startlistUrl)
+            : Boolean(
+                (d.combined && typeof d.combined === 'object' && d.combined.url) || startlistUrl,
+              )
           setHasStartlists(anyCategory || anyWave || anyGroup || anyCombined)
         },
       )
@@ -58,8 +70,15 @@ export default function StartlistsDownloadLink({
   if (loading || !hasStartlists) return null
 
   return (
-    <a href={`/wyniki/${raceId}`} className={className}>
-      {label}
-    </a>
+    <>
+      <button type="button" className={className} onClick={() => setOpen(true)}>
+        {label}
+      </button>
+      {open ? (
+        <RaceDownloadsModal title="Listy startowe" subtitle={raceName} onClose={close}>
+          <RaceStartlistsDownloads raceId={raceId} combinedStartlistUrl={startlistUrl} />
+        </RaceDownloadsModal>
+      ) : null}
+    </>
   )
 }
